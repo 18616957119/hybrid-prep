@@ -1,0 +1,2767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>混合训练 · Hybrid Plan v1.6</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0B0D10">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230B0D10'/><path d='M8 22L14 10L18 18L24 8' stroke='%23FF8A1F' stroke-width='3' fill='none'/></svg>">
+<style>
+:root{
+  --bg:#0B0D10; --panel:#15181D; --panel2:#1C2028; --line:#262B34;
+  --text:#EDEFF2; --muted:#8B929C; --dim:#5E656F;
+  --accent:#FF8A1F; --ok:#35D07F; --bad:#FF5C5C;
+  --num:"ui-monospace","SFMono-Regular",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  padding-bottom:40px;
+}
+.wrap{max-width:680px;margin:0 auto;padding:0 18px}
+header{padding:26px 0 14px;border-bottom:1px solid var(--line);margin-bottom:22px;position:relative}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{font-size:22px;letter-spacing:.12em;font-weight:700}
+.brand span{font-size:11px;color:var(--dim);letter-spacing:.2em}
+.ver{position:absolute;top:24px;right:0;font-family:var(--num);font-size:11px;color:var(--accent);letter-spacing:.04em;border:1px solid var(--line);padding:2px 7px;border-radius:3px}
+.sub{color:var(--muted);font-size:13px;margin-top:6px}
+
+.nav{display:flex;align-items:flex-end;gap:2px;margin:16px 0 22px;border-bottom:1px solid var(--line)}
+.nav button{
+  background:none;border:none;color:#5E656F;font-size:12px;padding:10px 8px 11px;white-space:nowrap;
+  cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;letter-spacing:.01em;
+  transition:color .15s;
+}
+.nav button[data-tab="today"]{font-size:16px;font-weight:700;padding:8px 12px 11px;color:#8B929C}
+.nav button[data-tab="today"].on{color:#fff}
+.nav button.on{color:var(--text);border-bottom-color:var(--accent)}
+.nav button[data-tab="today"].on{border-bottom-width:3px}
+
+section{display:none}
+section.show{display:block}
+
+.group{margin-bottom:26px}
+.group h2{
+  font-size:11px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;
+  margin-bottom:12px;font-weight:500;
+}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #1B1F26}
+details summary{
+  font-size:11px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;
+  cursor:pointer;list-style:none;padding:4px 0 10px;display:flex;justify-content:space-between;
+}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:"展开 +";color:var(--accent);font-size:11px;letter-spacing:.05em}
+details[open] summary::after{content:"收起 −"}
+details .hint{font-size:12px;color:var(--dim);margin-bottom:6px;line-height:1.6}
+.row .lab{font-size:14px;color:#C9CED6;flex:1}
+.row .lab small{display:block;color:var(--dim);font-size:11px;margin-top:1px}
+.row input{
+  width:110px;background:var(--panel);border:1px solid var(--line);color:var(--text);
+  padding:8px 10px;border-radius:6px;font-family:var(--num);font-size:14px;text-align:right;
+}
+.row input:focus{outline:none;border-color:var(--accent)}
+.row.stack{display:block;padding:13px 0}
+.row.stack .lab{margin-bottom:9px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{
+  background:var(--panel);border:1px solid var(--line);color:var(--muted);
+  padding:8px 12px;border-radius:6px;font-family:var(--num);font-size:13px;min-width:38px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s,color .12s,border-color .12s;
+}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:#100B04;font-weight:600}
+.seg button:active{opacity:.8}
+.row select{
+  background:var(--panel);border:1px solid var(--line);color:var(--text);
+  padding:8px 10px;border-radius:6px;font-family:inherit;font-size:14px;
+}
+.unit{color:var(--dim);font-size:12px;width:34px}
+
+.btn{
+  display:block;width:100%;padding:14px;background:var(--accent);color:#100B04;
+  border:none;border-radius:8px;font-size:15px;font-weight:600;font-family:inherit;
+  cursor:pointer;margin-top:8px;
+}
+.btn:active{opacity:.85}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--text)}
+
+/* 诊断 */
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:26px}
+.raceTag{font-size:12px;color:var(--accent);letter-spacing:.06em;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 14px}
+.kpi .k{font-size:10px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+.kpi .v{font-family:var(--num);font-size:26px;margin-top:6px;letter-spacing:-.02em}
+.kpi .v small{font-size:12px;color:var(--muted);margin-left:2px}
+.kpi.acc .v{color:var(--accent)}
+.kpi.bad .v{color:var(--bad)}
+
+.bars{margin-bottom:28px}
+.bar{display:grid;grid-template-columns:96px 1fr 62px;gap:10px;align-items:center;padding:9px 0}
+.bar .n{font-size:13px;color:#C9CED6}
+.bar .track{height:8px;background:#1B1F26;border-radius:4px;position:relative;overflow:hidden}
+.bar .fill{position:absolute;left:0;top:0;height:100%;border-radius:4px}
+.bar .t{font-family:var(--num);font-size:13px;text-align:right;color:var(--muted)}
+.bar .t.gap{color:var(--bad)}
+
+.legend{display:flex;gap:18px;font-size:11px;color:var(--dim);margin-top:8px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+
+/* 计划 */
+.weeks{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:560px){.weeks{grid-template-columns:repeat(3,1fr)}}
+.wk{
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;
+  cursor:pointer;position:relative;
+}
+.wk:hover{border-color:#39404C}
+.wk .ph{font-size:10px;letter-spacing:.14em;color:var(--accent);text-transform:uppercase}
+.wk .no{font-family:var(--num);font-size:20px;margin-top:4px}
+.wk .meta{font-size:11px;color:var(--muted);margin-top:6px;font-family:var(--num)}
+.wk .done{position:absolute;right:10px;top:10px;font-size:10px;color:var(--ok)}
+
+.detail{margin-top:24px}
+.dhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+.dhead h3{font-size:17px;font-weight:600}
+.dhead span{font-family:var(--num);color:var(--muted);font-size:13px}
+
+.day{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:12px;overflow:hidden}
+.day .top{display:flex;justify-content:space-between;align-items:center;padding:13px 15px;border-bottom:1px solid var(--line)}
+.day .dn{font-size:14px;font-weight:600}
+.day .dt{font-size:11px;color:var(--dim);margin-top:2px}
+.day .tag{font-size:10px;letter-spacing:.1em;padding:3px 8px;border-radius:4px;border:1px solid var(--line);color:var(--muted)}
+.day ul{list-style:none;padding:6px 0}
+.day li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 10px;padding:9px 15px;font-size:13px;border-bottom:1px solid #1A1E25;align-items:baseline}
+.day li:last-child{border-bottom:none}
+.day li .ex{color:#C9CED6;flex:1 1 auto;min-width:110px}
+.day li .rx{font-family:var(--num);color:var(--accent);flex:0 1 auto;margin-left:auto;text-align:right;max-width:100%}
+.day .note{padding:10px 15px;font-size:12px;color:var(--dim);background:#12151A}
+
+.empty{color:var(--dim);font-size:13px;padding:30px 0;text-align:center}
+
+.toast{
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);
+  background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  padding:10px 18px;border-radius:20px;font-size:13px;opacity:0;pointer-events:none;
+  transition:.22s;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+input[type=date]{color-scheme:dark}
+.cd{margin:0 0 16px;padding:16px 18px;border-radius:12px;background:linear-gradient(150deg,#1E232C,#14171C);
+  border:1px solid #2C323C;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.cd .l{font-size:11px;color:var(--dim);letter-spacing:.06em}
+.cd .n{font-size:30px;font-weight:700;color:var(--accent);line-height:1.15;margin-top:2px}
+.cd .n small{font-size:12px;font-weight:400;color:var(--muted);margin-left:3px}
+.cd .r{font-size:11px;color:var(--muted);text-align:right;line-height:1.7}
+.cd.race{background:linear-gradient(150deg,#3A2410,#1A1410);border-color:#5A3A16}
+.chk{margin-top:14px;padding:16px 18px;border-radius:12px;background:#16110C;border:1px solid #4A3316}
+.chk h3{font-size:14px;font-weight:600;color:#FFB35C;margin:0 0 10px}
+.chk ul{margin:0;padding:0;list-style:none}
+.chk li{font-size:12.5px;color:#C9CED6;line-height:1.9;display:flex;gap:10px}
+.chk li b{color:#FFB35C;font-weight:600;min-width:52px;display:inline-block}
+/* 今日 */
+.tdate{font-size:11px;color:var(--dim);letter-spacing:.06em}
+.ttitle{font-size:21px;font-weight:700;margin:6px 0 3px}
+.ttag{font-size:10px;letter-spacing:.12em;color:var(--accent);margin-bottom:16px}
+.it{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px;transition:.15s}
+.it.done{border-color:#2C5B45;background:#111A15}
+.it .l1{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.it .l1 .ex{font-size:14px;color:#E6E9ED;flex:1 1 auto;min-width:0}
+.it .l1 .rx{font-family:var(--num);font-size:12px;color:var(--accent);text-align:right;white-space:nowrap}
+.it .l2{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:nowrap}
+.it .l2 input::placeholder{color:#4E555F}
+.it .l2 input{flex:0 0 auto;width:68px;padding:7px 10px;font-size:13px;background:#0E1116;border:1px solid #272C35;border-radius:6px;color:var(--text);font-family:var(--num)}
+.it .l2 .unit{font-size:11px;color:var(--dim);white-space:nowrap;flex:0 0 auto}
+.it .ck{margin-left:auto;font-size:11px;padding:7px 16px;border-radius:16px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.it.done .ck{border-color:#2C7B52;color:#5FE39B}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.sum div{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px}
+.sum .k{font-size:11px;color:var(--dim)}
+.sum .v{font-family:var(--num);font-size:20px;margin-top:4px}
+.sum .v.acc{color:var(--ok)}
+.restbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;text-align:center}
+.restbox .t{font-size:15px;color:#C9CED6}
+.restbox .s{font-size:12px;color:var(--dim);margin-top:8px}
+.mon{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px}
+.mon .h{font-size:10px;color:var(--dim);text-align:center;padding-bottom:2px}
+.mon .d{height:44px;display:flex;align-items:center;justify-content:center;font-size:12px;border-radius:6px;background:#14171C;color:#5E656F;font-family:var(--num)}
+.mon .d.on{background:#2A1B0C;color:#FFB35C;border:1px solid #5A3A16}
+.mon .d.today{box-shadow:0 0 0 1px #6B7480 inset}
+.mon .d.blank{background:transparent}
+.wodhead{padding:2px 0 16px}
+.wodhead .wt{font-size:19px;font-weight:700}
+.wodhead .ws{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.7}
+.wcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 15px;margin-bottom:10px}
+.wcard .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.wcard .nm{font-size:15px;font-weight:600}
+.wcard .lv{font-size:10px;padding:2px 7px;border-radius:4px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.wcard .lv.l1{color:#5FE39B;border-color:#2C5B45}
+.wcard .lv.l3{color:#FF8A1F;border-color:#5A3A16}
+.wcard .fm{font-size:11px;color:var(--accent);margin-top:5px;letter-spacing:.02em}
+.wcard ul{list-style:none;margin:10px 0 0;padding:0}
+.wcard li{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:#C9CED6;padding:5px 0;border-bottom:1px solid #1A1E25}
+.wcard li:last-child{border-bottom:none}
+.wcard li b{font-family:var(--num);color:#E6E9ED;font-weight:500;white-space:nowrap}
+.wcard .rx{font-size:11px;color:var(--dim);margin-top:8px}
+.wcard .sc{font-size:11px;color:#8FA38F;margin-top:6px;line-height:1.6}
+.wcard .act{display:flex;gap:8px;align-items:center;margin-top:12px}
+.wcard .act input.wtime{flex:1;padding:8px 10px;font-size:13px;background:#0E1116;border:1px solid #272C35;border-radius:6px;color:var(--text);font-family:var(--num)}
+.wcard .act button{padding:8px 16px;border-radius:16px;border:1px solid #2C7B52;background:transparent;color:#5FE39B;font-size:12px;cursor:pointer}
+.wcard .wrst{float:right;background:none;border:1px solid #3A2020;color:#B06A6A;font-size:10.5px;padding:3px 9px;border-radius:12px;font-family:inherit;cursor:pointer}
+.wcard .wrst.arm{background:#3A2020;color:#FF8B8B;border-color:#6B3030}
+.wcard .best{font-size:11px;color:var(--ok);margin-top:8px}
+.it .alt{font-size:11px;color:#7E8A7E;margin-top:7px;line-height:1.6}
+.hero{background:linear-gradient(158deg,#1A1F27 0%,#111419 62%);border:1px solid #262C36;
+  border-radius:14px;padding:18px 20px 20px;margin-bottom:16px}
+.hero .d{font-size:11px;color:#6B7280;letter-spacing:.09em;font-family:var(--num)}
+.hero .t{font-size:25px;font-weight:700;margin:9px 0 11px;letter-spacing:-.01em;line-height:1.15}
+.hero .pill{display:inline-block;font-size:10.5px;padding:4px 11px;border-radius:20px;
+  background:rgba(255,138,31,.12);color:#FFB35C;border:1px solid rgba(255,138,31,.26);letter-spacing:.06em}
+.hero.rest .t{font-size:22px;color:#C9CED6}
+.mon .d{cursor:pointer;position:relative}
+.mon .d .dot{position:absolute;top:3px;right:4px;width:4px;height:4px;border-radius:50%;background:#4FA8FF}
+.mon .d.won{background:#0E2338;color:#7FC4FF;border:1px solid #1E4A6E}
+.sheet{position:fixed;inset:0;background:rgba(4,6,9,.72);display:none;z-index:60;align-items:flex-end}
+.sheet.on{display:flex}
+.sheetIn{background:#15181D;border:1px solid #262B34;border-bottom:none;border-radius:18px 18px 0 0;
+  width:100%;max-height:78vh;overflow:auto;padding:22px 20px 34px;animation:up .22s ease}
+@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:translateY(0);opacity:1}}
+.sheetIn .st{font-size:19px;font-weight:700;margin-bottom:4px}
+.sheetIn .sd{font-size:11px;color:var(--dim);margin-bottom:18px;font-family:var(--num)}
+.sheetIn .blk{margin-bottom:16px}
+.sheetIn .blk h4{font-size:11px;letter-spacing:.1em;color:#6B7280;margin:0 0 8px;font-weight:500}
+.sheetIn .row2{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #1A1E25;font-size:13px}
+.sheetIn .row2 b{font-family:var(--num);color:#FF8A1F;font-weight:500}
+.sheetIn .row2 .sub2{font-size:11px;color:var(--dim)}
+.sheetIn .close{width:100%;margin-top:6px;padding:12px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:13px;font-family:inherit}
+.hint{font-size:11.5px;color:var(--dim);line-height:1.7;margin:0 0 2px}
+/* 新手引导 */
+.intro{position:fixed;inset:0;background:rgba(4,6,9,.82);display:none;z-index:80;align-items:flex-end}
+.intro.on{display:flex}
+.introBox{background:#15181D;border:1px solid #262B34;border-bottom:none;border-radius:20px 20px 0 0;
+  width:100%;padding:26px 22px calc(22px + env(safe-area-inset-bottom));animation:up .24s ease}
+.introBox .step{font-family:var(--num);font-size:11px;color:#FF8A1F;letter-spacing:.08em}
+.introBox h3{font-size:21px;font-weight:700;margin:9px 0 10px;line-height:1.35}
+.introBox p{font-size:14px;line-height:1.75;color:#B9BFC8;margin:0 0 20px}
+.introBox p em{font-style:normal;color:#FFA24F}
+.introBox .dots{display:flex;gap:6px;margin-bottom:18px}
+.introBox .dot{height:3px;flex:1;background:#262B34;border-radius:2px;transition:background .2s}
+.introBox .dot.on{background:#FF8A1F}
+.introBox .acts{display:flex;gap:10px}
+.introBox .acts button{flex:1;padding:13px;border-radius:10px;font-family:inherit;font-size:14px;cursor:pointer}
+.introBox .skip{background:transparent;border:1px solid #303640;color:#8B929C}
+.introBox .next{background:#FF8A1F;border:1px solid #FF8A1F;color:#12151A;font-weight:600}
+.introBox .never{display:flex;align-items:center;gap:8px;font-size:12px;color:#6B7280;
+  margin-top:15px;justify-content:center}
+.introBox .never input{accent-color:#FF8A1F;width:15px;height:15px}
+/* 随便练：搜索 + 摇一签 */
+.wodtools{display:flex;gap:8px;margin-bottom:12px}
+.wsearch{flex:1;display:flex;align-items:center;gap:8px;background:#0E1116;border:1px solid #272C35;
+  border-radius:10px;padding:0 12px;height:44px;min-width:0;transition:border-color .15s}
+.wsearch:focus-within{border-color:#4A3A22}
+.wsearch svg{width:16px;height:16px;flex:0 0 auto;stroke:#6B7280;fill:none;stroke-width:1.8}
+.wsearch input{flex:1;min-width:0;background:none;border:none;outline:none;color:#EDEFF2;
+  font-size:13px;font-family:inherit}
+.wsearch input::placeholder{color:#5E656F}
+.wsearch .clr{flex:0 0 auto;width:18px;height:18px;border-radius:50%;border:none;background:#252A32;
+  color:#8B929C;font-size:11px;line-height:1;cursor:pointer;display:none}
+.wsearch.has .clr{display:block}
+.wdice{flex:0 0 auto;height:44px;padding:0 15px;border-radius:10px;background:#FF8A1F;border:1px solid #FF8A1F;
+  color:#12151A;font-weight:700;font-size:13.5px;font-family:inherit;cursor:pointer;letter-spacing:.02em}
+.wdice:active{transform:scale(.97)}
+.wodcount{font-size:11px;color:#6B7280;margin:12px 0 10px}
+.wodcount b{color:#FF8A1F;font-weight:500}
+.wcard li.hit{color:#FF8A1F}
+/* 摇一签 */
+.dice{position:fixed;inset:0;background:rgba(4,6,9,.9);display:none;z-index:70;align-items:center;
+  justify-content:center;padding:24px}
+.dice.on{display:flex}
+.diceIn{width:100%;max-width:340px;background:#15181D;border:1px solid #303640;border-radius:18px;
+  padding:30px 22px 22px;text-align:center;animation:din .2s ease}
+@keyframes din{from{transform:scale(.94);opacity:.55}to{transform:scale(1);opacity:1}}
+.diceIn .dl{font-size:10px;letter-spacing:.2em;color:#FF8A1F}
+.diceIn .dn{font-size:33px;font-weight:800;margin:16px 0 8px;line-height:1.2;min-height:42px;
+  letter-spacing:-.01em;transition:opacity .05s}
+.diceIn .dm{font-size:12px;color:#8B929C;margin-bottom:24px;min-height:17px}
+.diceIn .da{display:flex;gap:10px}
+.diceIn .da button{flex:1;padding:13px;border-radius:10px;font-family:inherit;font-size:14px;cursor:pointer}
+.diceIn .again{background:transparent;border:1px solid #303640;color:#B9BFC8}
+.diceIn .go{background:#FF8A1F;border:1px solid #FF8A1F;color:#12151A;font-weight:600}
+.diceIn .go:disabled{opacity:.4}
+/* 动作器械标签 */
+.eq{display:inline-block;font-style:normal;font-size:9px;line-height:1;padding:3px 5px;margin-left:6px;
+  border-radius:3px;border:1px solid #2A303A;color:#7C8490;vertical-align:middle}
+/* WOD 放大详情 */
+.wsheet{position:fixed;inset:0;background:rgba(4,6,9,.86);display:none;z-index:65;align-items:flex-end}
+.wsheet.on{display:flex}
+.wsheetIn{background:#14171C;border-radius:20px 20px 0 0;width:100%;height:92vh;overflow:auto;
+  padding:0 20px 120px;animation:up .24s ease;-webkit-overflow-scrolling:touch}
+.whead{position:sticky;top:0;background:#14171C;padding:16px 0 12px;display:flex;justify-content:space-between;
+  align-items:flex-start;z-index:2;border-bottom:1px solid #1E232B}
+.wname{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.15}
+.wmeta{font-size:12px;color:#FF8A1F;margin-top:5px;letter-spacing:.02em}
+.wclose{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1px solid #262B34;background:#1C2028;
+  color:#8B929C;font-size:18px;line-height:1;cursor:pointer}
+.wbadges{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 6px}
+.wbadges span{font-size:10px;padding:4px 8px;border-radius:4px;border:1px solid #2A303A;color:#9AA2AC}
+.wbadges span.hi{border-color:#5A3A16;color:#FFA24F}
+.wlist{margin:16px 0 4px}
+.wrow{display:flex;align-items:baseline;gap:12px;padding:13px 0;border-bottom:1px solid #1A1E25}
+.wrow .wnum{font-family:var(--num);font-size:11px;color:#5E656F;width:16px;flex:0 0 auto}
+.wrow .wex{flex:1;font-size:17px;font-weight:600;line-height:1.35;min-width:0}
+.wrow .wrep{font-family:var(--num);font-size:17px;color:#FF8A1F;font-weight:600;white-space:normal;text-align:right;line-height:1.3}
+.wsec{margin-top:20px}
+.wsec h4{font-size:11px;letter-spacing:.08em;color:#6B7280;margin:0 0 8px;font-weight:500}
+.wsec p{margin:0;font-size:14px;line-height:1.7;color:#B9BFC8}
+.wsec p.alt2{color:#8FA38F}
+.wbest{margin-top:18px;padding:12px 14px;border:1px solid #23402F;background:#0F1D16;border-radius:10px;
+  font-size:13px;color:#5FE39B;font-family:var(--num)}
+.wbar{position:fixed;left:0;right:0;bottom:0;padding:12px 20px calc(12px + env(safe-area-inset-bottom));
+  background:rgba(20,23,28,.97);border-top:1px solid #262B34;display:flex;gap:10px;z-index:66}
+.wbar button{flex:1;padding:13px;border-radius:10px;font-size:14px;font-family:inherit;cursor:pointer;border:1px solid #2C7B52}
+.wbar .prim{background:#FF8A1F;border-color:#FF8A1F;color:#12151A;font-weight:600}
+.wbar .sec{background:transparent;color:#C9CED6;border-color:#303640}
+/* 每项独立秒表 + 总时间 */
+.wrow{align-items:center}
+.wrow .wcol{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:0 1 auto;max-width:44%}
+.wrow .wt{font-family:var(--num);font-size:12px;color:#6B7280;letter-spacing:.02em}
+.wrow.on .wt{color:#FF8A1F}
+.wrow .wgo{flex:0 0 auto;width:32px;height:32px;border-radius:50%;border:1px solid #303640;background:#1C2028;
+  color:#9AA2AC;font-size:13px;line-height:1;cursor:pointer;font-family:inherit;
+  display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s,color .15s;
+  -webkit-tap-highlight-color:transparent}
+.wrow.on .wgo{background:#FF8A1F;border-color:#FF8A1F;color:#12151A}
+.wrow.on .wex{color:#FF8A1F}
+.wsum{margin-top:22px;padding:16px;border:1px solid #2A303A;background:#161A20;border-radius:12px}
+.wsum .lbl{font-size:11px;letter-spacing:.08em;color:#6B7280}
+.wsum .big{font-family:var(--num);font-size:34px;font-weight:700;line-height:1.1;margin-top:6px;color:#EDEFF2}
+.wsum .big.live{color:#FF8A1F}
+.wsum .sub{font-size:12px;color:#8B929C;margin-top:5px;line-height:1.5}
+.wsum .acts{display:flex;gap:8px;margin-top:12px}
+.wsum .acts button{flex:1;padding:10px;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer;
+  border:1px solid #2C7B52;background:#14251C;color:#5FE39B}
+.wsum .acts button.ghost{background:transparent;border-color:#303640;color:#8B929C}
+.wsum .acts button.arm{border-color:#8A3A3A;color:#FF8A8A;background:#251616}
+.wcard{cursor:pointer}
+.wcard:active{background:#181C22}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><h1>HYBRID</h1><span>PLAN</span></div>
+    <div class="ver">v1.1.0</div>
+    <div class="sub">备赛计划 + 随便练 · 新手也能上手</div>
+  </header>
+
+  <nav class="nav">
+    <button data-tab="today" class="on">今天</button>
+    <button data-tab="wod">随便练</button>
+    <button data-tab="plan">计划</button>
+    <button data-tab="diag">弱项</button>
+    <button data-tab="input">我的</button>
+  </nav>
+
+  <section id="tab-today" class="show">
+    <div id="todayBody"><div class="empty">还没有计划</div></div>
+  </section>
+
+  <section id="tab-wod">
+    <div class="wodhead">
+      <div class="wt">今天不想听话？随便练一套</div>
+      <div class="ws">不用管 12 周计划，挑一条练完就走。练完记时间，下次来比。</div>
+    </div>
+    <div class="wodtools">
+      <div class="wsearch" id="wsearch">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 L21 21"/></svg>
+        <input id="wodQ" type="text" placeholder="搜动作，例如 高翻 / 雪橇" autocomplete="off">
+        <button class="clr" id="wodQClear">×</button>
+      </div>
+      <button class="wdice" id="wodDice">摇一签</button>
+    </div>
+    <div class="seg" id="wodSeg"></div>
+    <div class="wodcount" id="wodCount"></div>
+    <div id="wodBody"></div>
+  </section>
+
+  <section id="tab-input">
+    <p class="hint" style="margin-bottom:16px">填你现在的水平，不用很准，估个数就行。练一阵回来改，计划会跟着变。</p>
+    <div class="group">
+      <h2>你练了多久</h2>
+      <div class="seg" id="lvSeg" data-val="exp">
+        <button type="button" data-v="new">刚开始练</button><button type="button" data-v="exp" class="on">有训练基础</button>
+      </div>
+      <p class="hint" style="margin-top:10px">新手不用填杠铃重量，填两个数就行，重量我们替你估。</p>
+    </div>
+
+    <div class="group" id="newbieBox" style="display:none">
+      <h2>两分钟填完</h2>
+      <div class="row"><div class="lab">体重<small>单位 kg</small></div><input id="bw" type="number" inputmode="decimal" placeholder="75"></div>
+      <div class="row stack"><div class="lab">标准俯卧撑能连做几个</div>
+        <div class="seg" id="pushSeg" data-val="5to15">
+          <button type="button" data-v="lt5">不到 5 个</button><button type="button" data-v="5to15" class="on">5–15 个</button><button type="button" data-v="gt15">15 个以上</button>
+        </div></div>
+      <div class="row stack"><div class="lab">徒手深蹲能连做几个</div>
+        <div class="seg" id="sqSeg" data-val="5to15">
+          <button type="button" data-v="lt5">不到 10 个</button><button type="button" data-v="5to15" class="on">10–25 个</button><button type="button" data-v="gt15">25 个以上</button>
+        </div></div>
+      <p class="hint">重量按体重和这两个数估，练两周觉得轻或重，就切到「有训练基础」填真实 1RM。</p>
+    </div>
+
+    <div class="group" id="expBox">
+      <h2>力量水平</h2>
+      <div class="row"><div class="lab">深蹲</div><input id="squat" type="number" inputmode="decimal" placeholder="kg"></div>
+      <div class="row"><div class="lab">硬拉</div><input id="dead" type="number" inputmode="decimal" placeholder="kg"></div>
+      <div class="row"><div class="lab">卧推</div><input id="bench" type="number" inputmode="decimal" placeholder="kg"></div>
+      <div class="row"><div class="lab">站姿推举</div><input id="press" type="number" inputmode="decimal" placeholder="kg"></div>
+      <div class="row"><div class="lab">引体最大次数</div><input id="pullup" type="number" inputmode="numeric" placeholder="次"></div>
+    </div>
+
+    <div class="group">
+      <h2>跑步水平</h2>
+      <div class="row"><div class="lab">5K 最好成绩<small>格式 25:30</small></div><input id="run5k" data-time type="text" inputmode="numeric" placeholder="25:30"></div>
+      <div class="row"><div class="lab">10K 最好成绩<small>格式 52:00</small></div><input id="run10k" data-time type="text" inputmode="numeric" placeholder="52:00"></div>
+    </div>
+
+    <div class="group">
+      <h2>目标赛事</h2>
+      <div class="row stack"><div class="lab">性别<small>决定精英对标基准</small></div>
+        <div class="seg" id="genderSeg" data-val="m">
+          <button type="button" data-v="m" class="on">男</button><button type="button" data-v="w">女</button>
+        </div></div>
+      <div class="row stack"><div class="lab">赛事类型</div>
+        <div class="seg" id="raceSeg" data-val="hyrox">
+          <button type="button" data-v="hyrox" class="on">Hyrox</button><button type="button" data-v="deka">DEKA</button><button type="button" data-v="spartan">斯巴达</button><button type="button" data-v="cpmac">CPMAC</button><button type="button" data-v="crossfit">CrossFit</button><button type="button" data-v="alltra">全力游戏</button><button type="button" data-v="mudder">泥泞赛</button><button type="button" data-v="hybrid">Hybrid</button>
+        </div></div>
+      <div class="row"><div class="lab">目标完赛时间<small>格式 90 分钟写 90:00</small></div><input id="goal" data-time type="text" inputmode="numeric" placeholder="90:00"></div>
+      <div class="row"><div class="lab">比赛日期<small>不填则从今天起算 12 周</small></div><input id="raceDate" type="date"></div>
+    </div>
+
+    <div class="group">
+      <h2>日程<small style="font-weight:400;color:var(--dim);font-size:11px;margin-left:8px">可选 2–7 天 · 45–120 分钟</small></h2>
+      <div class="row stack"><div class="lab">每周可训练天数<small>单位：天</small></div>
+        <div class="seg" id="daysSeg" data-val="4">
+          <button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4" class="on">4</button><button type="button" data-v="5">5</button><button type="button" data-v="6">6</button><button type="button" data-v="7">7</button>
+        </div></div>
+      <div class="row stack"><div class="lab">单次可用时长<small>单位：分钟</small></div>
+        <div class="seg" id="durSeg" data-val="75">
+          <button type="button" data-v="45">45</button><button type="button" data-v="60">60</button><button type="button" data-v="75" class="on">75</button><button type="button" data-v="90">90</button><button type="button" data-v="105">105</button><button type="button" data-v="120">120</button>
+        </div></div>
+      <div class="row stack"><div class="lab">训练年限<small>单位：年，决定积累期长短</small></div>
+        <div class="seg" id="yearsSeg" data-val="1to2">
+          <button type="button" data-v="under6">不足 0.5</button><button type="button" data-v="6to12">0.5–1</button><button type="button" data-v="1to2" class="on">1–2</button><button type="button" data-v="2to5">2–5</button><button type="button" data-v="over5">5 以上</button>
+        </div></div>
+    </div>
+
+    <div class="group">
+      <details>
+        <summary>站点实测 · 进阶，可不填</summary>
+        <p class="hint" id="stHint">按最近一次比赛或训练最好成绩填。可以直接打数字，445 会解析成 4:45。</p>
+        <div id="stList"></div>
+      </details>
+    </div>
+
+    <button class="btn" id="gen">生成训练计划</button>
+
+    <div class="group" id="dataGroup" style="margin-top:30px;border-top:1px solid var(--line);padding-top:22px">
+      <h2>训练数据</h2>
+      <div class="kpis" id="dataKpis"></div>
+      <div id="dataTrend"></div>
+      <div id="dataPr"></div>
+      <p class="hint">吨位口径：只有「勾了完成 + 有重量」的次数型动作才计入。点了完成没填重量，按模板重量记；想记真实重量，到「今天」页的动作行里改。</p>
+      <p class="hint" style="margin-top:6px;color:var(--dim)">吨位只统计「有重量 + 次数型」的动作，跑步、划船、计时类不计入。</p>
+    </div>
+  </section>
+
+  <section id="tab-diag">
+    <div id="diagBody"><div class="empty">先在「我的水平」里填数据，再生成计划</div></div>
+  </section>
+
+  <section id="tab-plan">
+    <p class="hint" style="margin-bottom:14px">重量对不上就自己降：减 20% 重量、少做 2 次、或换成更容易的变式。动作模式对了，效果不会差太多。</p>
+    <div id="planBody"><div class="empty">还没有计划</div></div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="dice" id="dice"><div class="diceIn">
+  <div class="dl">今天练这个</div>
+  <div class="dn" id="diceName">摇一摇</div>
+  <div class="dm" id="diceMeta">手别抖</div>
+  <div class="da">
+    <button class="again" id="diceAgain">再摇一次</button>
+    <button class="go" id="diceGo" disabled>就练这个</button>
+  </div>
+</div></div>
+<div class="intro" id="intro"><div class="introBox" id="introBox"></div></div>
+<div class="wsheet" id="wodSheet">
+  <div class="wsheetIn" id="wodSheetIn"></div>
+  <div class="wbar">
+    <button class="prim" id="wodSave">保存图片</button>
+    <button class="sec" id="wodShare">分享</button>
+  </div>
+</div>
+<div class="sheet" id="daySheet"><div class="sheetIn" id="daySheetIn"></div></div>
+
+<script>
+/* ============ 存储 ============ */
+const KEY = 'hybrid_plan_v1';
+let S = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || {}; }catch(e){ return {}; } }
+let storeOK = true;
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); storeOK = true; }
+  catch(e){
+    if(storeOK){
+      storeOK = false;
+      const b = document.createElement('div');
+      b.id = 'storeWarn';
+      b.style.cssText = 'position:fixed;left:12px;right:12px;top:12px;z-index:70;background:#3A2020;border:1px solid #6B3030;color:#FFB3B3;font-size:12px;line-height:1.6;padding:10px 12px;border-radius:10px';
+      b.textContent = '当前环境不让存数据（无痕模式或本地文件打开），关闭后记录会丢。装 App 版可长期保存。';
+      document.body.appendChild(b);
+      setTimeout(()=>{ b.style.opacity='0'; b.style.transition='.3s'; setTimeout(()=>b.remove(),400); }, 6000);
+    }
+  }
+}
+
+/* ============ 工具 ============ */
+function toSec(str){
+  if(str === null || str === undefined || str === '') return 0;
+  const t = String(str).trim().replace('：',':').replace(/\s/g,'');
+  if(!t) return 0;
+  if(t.includes(':')){
+    const p = t.split(':').map(Number);
+    if(p.some(n=>isNaN(n))) return 0;
+    if(p.length === 2) return p[0]*60 + p[1];
+    if(p.length === 3) return p[0]*3600 + p[1]*60 + p[2];
+    return 0;
+  }
+  if(!/^\d+(\.\d+)?$/.test(t)) return 0;
+  if(t.includes('.')) return Math.round(parseFloat(t)*60); // 1.5 → 1 分 30 秒
+  const n = parseInt(t,10), len = t.length;
+  if(len <= 2) return n*60;                                // 25 → 25:00
+  if(len <= 4) return Math.floor(n/100)*60 + (n%100);      // 445 → 4:45，1445 → 14:45
+  return n*60;
+}
+// 时间框失焦自动格式化，让用户立刻看到解析结果
+document.addEventListener('blur', e=>{
+  const el = e.target;
+  if(!el || !el.hasAttribute || !el.hasAttribute('data-time')) return;
+  const s = toSec(el.value);
+  if(s > 0) el.value = fmt(s);
+}, true);
+function fmt(sec){
+  sec = Math.round(sec);
+  const m = Math.floor(sec/60), r = sec%60;
+  return m + ':' + String(r).padStart(2,'0');
+}
+function round25(v){ return Math.round(v/2.5)*2.5; }
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove('on'), 1800);
+}
+
+/* ============ 常量 ============ */
+/* 阶段模板：from/to 由计划总周数动态计算，默认 12 周 */
+const PHASES = [
+  {name:'积累期', from:1, to:4,  lo:.65, hi:.75, sets:'4 × 8', metcon:'有氧基础 20–25 分钟'},
+  {name:'强化期', from:5, to:8,  lo:.75, hi:.85, sets:'5 × 5', metcon:'阈值间歇 8–15 分钟'},
+  {name:'峰值期', from:9, to:11, lo:.85, hi:.95, sets:'3 × 3', metcon:'竞赛模拟 ≤5 分钟'},
+  {name:'减量期', from:12,to:12, lo:.70, hi:.75, sets:'2 × 3 技术', metcon:'轻松跑 25 分钟'}
+];
+
+/* 按总周数把 4 段拉开：12 周 = 4/4/3/1，更短就按 3:3:2 权重压缩，每段至少 1 周 */
+function setPhases(total){
+  let bounds;
+  if(total === 12){
+    bounds = [[1,4],[5,8],[9,11],[12,12]];
+  } else {
+    const a = [1,1,1,1];
+    let extra = Math.max(0, total - 4);
+    const total_extra = extra;
+    [3,3,2].forEach((w,i)=>{
+      if(extra <= 0) return;
+      const n = Math.min(extra, Math.max(0, Math.round(total_extra * w / 8)));
+      a[i] += n; extra -= n;
+    });
+    a[2] += extra;
+    /* 峰值期至少 2 周，从积累期借 */
+    if(total >= 7 && a[2] < 2){
+      const k = Math.min(a[0]-1, 2-a[2]);
+      a[0] -= k; a[2] += k;
+    }
+    let from = 1; bounds = [];
+    for(let i=0;i<4;i++){ bounds.push([from, from + a[i] - 1]); from += a[i]; }
+  }
+  PHASES.forEach((ph,i)=>{ ph.from = bounds[i][0]; ph.to = bounds[i][1]; });
+}
+
+/* ============ 日期与计划窗口 ============ */
+const DAYMS = 86400000;
+const WD = {'周一':0,'周二':1,'周三':2,'周四':3,'周五':4,'周六':5,'周日':6};
+
+function todayMid(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
+function addDays(d,n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
+function parseDate(v){
+  if(!v) return null;
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(v);
+  if(!m) return null;
+  return new Date(+m[1], +m[2]-1, +m[3]);
+}
+function fmtMD(d){ return (d.getMonth()+1) + '月' + d.getDate() + '日'; }
+function fmtYMD(d){
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function dayDate(start, w, dn){
+  return addDays(start, (w-1)*7 + (WD[dn] !== undefined ? WD[dn] : 0));
+}
+
+/* 由比赛日反推：总周数、起始周（对齐到周一）、剩余天数 */
+function planMeta(p){
+  const today = todayMid();
+  const race = parseDate(p && p.date);
+  if(!race || race <= today){
+    let start = addDays(today, -((today.getDay()+6)%7));
+    return {total:12, start, race:null, daysLeft:null};
+  }
+  const daysLeft = Math.round((race - today)/DAYMS);
+  let start = addDays(race, -Math.min(84, daysLeft));
+  start = addDays(start, -((start.getDay()+6)%7));
+  let total = Math.ceil(Math.round((race - start)/DAYMS)/7);
+  total = Math.max(4, Math.min(12, total));
+  return {total, start, race, daysLeft};
+}
+/* 统一入口：每次渲染前先把阶段边界设好 */
+function prepare(){
+  const M = planMeta(S.profile || {});
+  setPhases(M.total);
+  return M;
+}
+function weekRange(M, w){
+  const s = addDays(M.start, (w-1)*7);
+  return {s, e: addDays(s, 6)};
+}
+const VARIANTS = {
+  squat:['背蹲','前蹲','过头蹲'],
+  hinge:['传统硬拉','罗马尼亚硬拉','相扑硬拉'],
+  push:['杠铃卧推','斜板卧推','窄距卧推'],
+  pull:['引体向上','负重引体','胸触杠引体'],
+  press:['站姿推举','借力推','坐姿哑铃推举']
+};
+// 各阶段主项：积累期打基础，强化期换变式，峰值期回到比赛动作冲强度
+const SEQ = {
+  squat:['背蹲','前蹲','背蹲','背蹲'],
+  hinge:['传统硬拉','罗马尼亚硬拉','传统硬拉','传统硬拉'],
+  push:['杠铃卧推','斜板卧推','杠铃卧推','杠铃卧推'],
+  pull:['引体向上','负重引体','引体向上','引体向上'],
+  press:['站姿推举','借力推','站姿推举','站姿推举']
+};
+// 变式相对主项的 1RM 折算系数（前蹲、过头蹲都低于背蹲）
+const FACTOR = {
+  '背蹲':1, '前蹲':0.85, '过头蹲':0.55,
+  '传统硬拉':1, '罗马尼亚硬拉':0.85, '相扑硬拉':0.98,
+  '杠铃卧推':1, '斜板卧推':0.92, '窄距卧推':0.88,
+  '站姿推举':1, '借力推':1.12, '坐姿哑铃推举':0.8
+};
+/* 站点库：每个赛事从这里挑自己的一组 */
+const LIB = {
+  /* Hyrox 标准 8 站；bm = Pro 精英分段基准（秒），男/女两档，来源 2026 世锦赛 Season 8 大样本数据 */
+  ski:     {name:'滑雪机',   label:'SkiErg 1000m',      w:.07, bm:{m:225, w:256}, rx:'4 × 500m 全力，间歇 90 秒'},
+  push:    {name:'雪橇推',   label:'雪橇推 50m',         w:.16, bm:{m:144, w:158}, rx:'4 × 50m 比赛重量 +10%，组间 3 分钟'},
+  pull:    {name:'雪橇拉',   label:'雪橇拉 50m',         w:.11, bm:{m:200, w:230}, rx:'4 × 50m 比赛重量，组间 2 分钟'},
+  burpee:  {name:'Burpee',  label:'Burpee 跳远 80m',     w:.13, bm:{m:156, w:222}, rx:'5 × 20m 蛙跳式 burpee，间歇 2 分钟'},
+  row:     {name:'划船',     label:'划船 1000m',         w:.12, bm:{m:232, w:262}, rx:'5 × 500m 比赛配速，间歇 90 秒'},
+  carry:   {name:'农夫走',   label:'农夫走 200m',        w:.09, bm:{m:79,  w:102}, rx:'4 × 200m 比赛重量，组间 2 分钟'},
+  lunge:   {name:'箭步蹲',   label:'沙袋箭步 100m',       w:.16, bm:{m:175, w:194}, rx:'4 × 100m 负重箭步，间歇 2 分'},
+  wall:    {name:'墙球',     label:'墙球 100 次',        w:.12, bm:{m:235, w:270}, rx:'5 × 30 次连做，间歇 90 秒'},
+
+  /* 通用 / DEKA / CrossFit 项目 */
+  box:     {name:'跳箱',     label:'跳箱 20 次',         w:.10, rx:'5 × 20 次，间歇 60 秒'},
+  sandbag: {name:'沙袋扛',   label:'沙袋扛 100m',        w:.11, rx:'4 × 100m 比赛重量，组间 2 分钟'},
+  rope:    {name:'战绳',     label:'战绳 20 圈',         w:.08, rx:'5 × 20 秒全力，休 40 秒'},
+  medball: {name:'药球',     label:'药球 80 次',         w:.08, rx:'5 × 16 次砸球/抛射，间歇 60 秒'},
+  situp:   {name:'药球仰卧起坐', label:'药球仰卧起坐 25 次', w:.07, rx:'4 × 25 次，间歇 60 秒'},
+  airbike: {name:'风阻自行车', label:'风阻自行车 25 卡',   w:.08, rx:'6 × 15 卡全力，休 60 秒'},
+  deadlift:{name:'杠铃硬拉', label:'杠铃硬拉 50 次',      w:.15, rx:'4 × 12 次 @ 60–70% 1RM，间歇 2 分'},
+  thruster:{name:'火箭推',   label:'火箭推 20 次',       w:.11, rx:'5 × 10 次 @ 比赛重量，间歇 90 秒'},
+  pullupx: {name:'引体向上', label:'引体向上 20 次',      w:.11, rx:'5 × 5–8 次，间歇 2 分钟'},
+  jumprope:{name:'跳重绳',   label:'跳重绳 200 次',       w:.06, rx:'6 × 40 次，休 45 秒'},
+  boxburpee:{name:'波比跳箱行进', label:'波比跳箱行进 100m', w:.12, rx:'4 × 25m，间歇 2 分钟'},
+
+  /* CPMAC 独有 */
+  tire:    {name:'翻轮胎',   label:'翻轮胎 100m',        w:.14, rx:'4 × 25m 翻胎，间歇 2 分钟'},
+
+  /* 障碍 / 越野类 */
+  trail:   {name:'越野跑',   label:'越野跑 5K',          w:1,   rx:'越野跑 5K @ 可控强度，含坡段'},
+  ropeclimb:{name:'爬绳',    label:'爬绳 4m',           w:.08, rx:'4 × 1 趟（4m），间歇 2 分钟'},
+  wallclimb:{name:'翻墙障碍', label:'翻墙障碍 10 次',     w:.08, rx:'4 × 3 次翻墙，间歇 90 秒'},
+  mud:     {name:'泥浆段',   label:'泥浆/涉水 100m',     w:.06, rx:'3 × 100m 泥浆行走，间歇 2 分'}
+};
+
+/* 每种赛事：跑步分段、每段公里、转换秒数、站点集合、站点名称覆盖 */
+const RACES = {
+  hyrox: {
+    label:'Hyrox', seg:8, km:1, trans:20,
+    keys:['ski','push','pull','burpee','row','carry','lunge','wall'],
+    lab:{ski:'SkiErg 1000m',push:'雪橇推 50m',pull:'雪橇拉 50m',burpee:'Burpee 跳远 80m',
+         row:'划船 1000m',carry:'农夫走 200m',lunge:'沙袋箭步 100m',wall:'墙球 100 次'}
+  },
+  deka: {
+    label:'DEKA FIT', seg:10, km:.5, trans:15,
+    keys:['lunge','row','box','situp','ski','carry','airbike','wall','push','burpee'],
+    lab:{lunge:'负重后撤箭步 30 次',row:'划船 500m',box:'跳箱跨越 20 次',situp:'药球仰卧起坐抛 25 次',
+         ski:'SkiErg 500m',carry:'农夫走 100m',airbike:'风阻自行车 25 卡',wall:'死球过墙 20 次',
+         push:'坦克推/拉 100m',burpee:'负重 Burpee 20 次'}
+  },
+  spartan: {
+    label:'斯巴达', seg:0, km:0, trans:0,
+    keys:['trail','ropeclimb','wallclimb','carry','burpee'],
+    lab:{trail:'越野跑（按你的组别填 5/10/21km）',ropeclimb:'爬绳 4m',wallclimb:'翻墙 + 障碍 10 次',
+         carry:'负重搬运 100m',burpee:'Burpee 30 次'}
+  },
+  cpmac: {
+    label:'CPMAC 中国力量', seg:5, km:.8, trans:20,
+    keys:['deadlift','jumprope','tire','row','lunge','rope','medball','airbike','boxburpee','sandbag'],
+    lab:{deadlift:'杠铃硬拉 50 次',jumprope:'跳重绳 200 次',tire:'翻轮胎 100m',
+         row:'划船机 6 分钟（男 1500m / 女 1000m）',lunge:'哑铃箭步蹲 100m',rope:'甩战绳 7.5m × 20 圈',
+         medball:'药球抛射 80 次',airbike:'风阻自行车 6 分钟（男 1500m / 女 1000m）',
+         boxburpee:'波比跳箱行进 100m（40 箱 + 40 波比）',sandbag:'沙袋搬运 100m'}
+  },
+  crossfit: {
+    label:'CrossFit Open', seg:0, km:0, trans:0,
+    keys:['thruster','pullupx','wall','row','deadlift','jumprope','burpee'],
+    lab:{thruster:'火箭推 20 次',pullupx:'引体向上 20 次',wall:'墙球 100 次',row:'划船 1000m',
+         deadlift:'杠铃硬拉 50 次',jumprope:'双摇 100 次',burpee:'Burpee 50 次'}
+  },
+  alltra: {
+    label:'全力游戏 ALLTRA', seg:0, km:0, trans:0,
+    keys:['thruster','pullupx','wall','deadlift','row','burpee','box','airbike'],
+    lab:{thruster:'火箭推 20 次',pullupx:'引体向上 20 次',wall:'墙球 100 次',deadlift:'杠铃硬拉 50 次',
+         row:'划船 1000m',burpee:'Burpee 50 次',box:'跳箱 20 次',airbike:'风阻自行车 25 卡'}
+  },
+  mudder: {
+    label:'Tough Mudder', seg:0, km:0, trans:0,
+    keys:['trail','wallclimb','mud','carry','burpee'],
+    lab:{trail:'越野跑 10–12mi',wallclimb:'翻墙/障碍 10 次',mud:'泥浆涉水 100m',
+         carry:'负重搬运 100m',burpee:'Burpee 30 次'}
+  },
+  hybrid: {
+    label:'Hybrid 综合', seg:8, km:1, trans:20,
+    keys:['ski','push','row','burpee','wall','carry','lunge','airbike'],
+    lab:{ski:'SkiErg 1000m',push:'雪橇推 50m',row:'划船 1000m',burpee:'Burpee 80m',
+         wall:'墙球 100 次',carry:'农夫走 200m',lunge:'负重箭步 100m',airbike:'风阻自行车 25 卡'}
+  }
+};
+function raceOf(p){ return RACES[(p && p.race) || 'hyrox'] || RACES.hyrox; }
+
+/* ============ 分段按钮组 ============ */
+function segVal(id){
+  const el = document.getElementById(id);
+  return el ? el.dataset.val : '';
+}
+function setSeg(id, v){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const btns = [...el.querySelectorAll('button')];
+  const hit = btns.find(x=>x.dataset.v === String(v));
+  if(!hit) return;
+  el.dataset.val = hit.dataset.v;
+  btns.forEach(x=>x.classList.toggle('on', x===hit));
+}
+function applyLevel(){
+  const lv = segVal('lvSeg') || 'exp';
+  const nb = document.getElementById('newbieBox');
+  const eb = document.getElementById('expBox');
+  if(nb) nb.style.display = lv === 'new' ? 'block' : 'none';
+  if(eb) eb.style.display = lv === 'new' ? 'none' : 'block';
+  if(lv === 'new'){
+    const box = document.getElementById('stList');
+    if(box) box.parentElement.parentElement.style.display = 'none';
+  } else {
+    const box = document.getElementById('stList');
+    if(box) box.parentElement.parentElement.style.display = '';
+  }
+}
+function initSegs(){
+  document.querySelectorAll('.seg').forEach(seg=>{
+    seg.addEventListener('click', e=>{
+      const b = e.target.closest('button[data-v]');
+      if(!b || !seg.contains(b)) return;
+      const btns = [...seg.querySelectorAll('button')];
+      seg.dataset.val = b.dataset.v;
+      btns.forEach(x=>x.classList.toggle('on', x===b));
+      if(seg.id === 'raceSeg') renderStationInputs();
+      if(seg.id === 'lvSeg') applyLevel();
+    });
+  });
+}
+
+/* ============ 站点输入（按赛事动态渲染） ============ */
+let tmpSt = {};
+const ST_HINT = {
+  hyrox:'Hyrox：8 段 1km 跑 + 8 个标准站点，按最近一次比赛或训练最好成绩填。',
+  deka:'DEKA FIT：10 个 zone，每 zone 前跑 500m，共 5K。',
+  spartan:'斯巴达：越野跑 + 障碍，主要填越野跑用时和障碍罚时。',
+  cpmac:'CPMAC：5 轮 × 800m 跑（共 4km）+ 10 项动作，翻轮胎是 100 米、跳重绳 200 次。',
+  crossfit:'CrossFit Open：每年 workout 不固定，这里用代表性项目估算。',
+  mudder:'Tough Mudder：10–12 英里越野 + 20 多个障碍，跑步占比最高。',
+  hybrid:'Hybrid 综合：无固定赛制，按你平时练的站点填，用来算弱项优先级。'
+};
+function collectStations(){
+  document.querySelectorAll('#stList input').forEach(el=>{
+    tmpSt[el.id.slice(3)] = toSec(el.value);
+  });
+}
+function renderStationInputs(){
+  collectStations();
+  const race = segVal('raceSeg') || 'hyrox';
+  const R = RACES[race] || RACES.hyrox;
+  document.getElementById('stList').innerHTML = R.keys.map(k=>{
+    const v = tmpSt[k] ? fmt(tmpSt[k]) : '';
+    return `<div class="row"><div class="lab">${(R.lab && R.lab[k]) || LIB[k].label}</div><input id="st_${k}" data-time type="text" inputmode="numeric" placeholder="分:秒" value="${v}"></div>`;
+  }).join('');
+  document.getElementById('stHint').textContent = ST_HINT[race] || ST_HINT.hyrox;
+}
+
+/* ============ 读取表单 ============ */
+function readForm(){
+  const g = id => document.getElementById(id);
+  const race = segVal('raceSeg') || 'hyrox';
+  const R = RACES[race] || RACES.hyrox;
+  const st = {};
+  R.keys.forEach(k=>{
+    const el = document.getElementById('st_'+k);
+    st[k] = el ? toSec(el.value) : (tmpSt[k] || 0);
+  });
+  const lv = segVal('lvSeg') || 'exp';
+  let sq = +g('squat').value || 0, dl = +g('dead').value || 0,
+      bp = +g('bench').value || 0, pr = +g('press').value || 0, pu = +g('pullup').value || 0;
+  if(lv === 'new'){
+    const bw = +g('bw').value || 0;
+    const pushF = {lt5:0.30, '5to15':0.45, gt15:0.60}[segVal('pushSeg')] || 0.45;
+    const sqF   = {lt5:0.45, '5to15':0.62, gt15:0.85}[segVal('sqSeg')] || 0.62;
+    const base = Math.max(30, bw || 70);
+    /* 用俯卧撑/深蹲表现推整体力量水平，再按比例分摊到四项 */
+    sq = Math.round(base * (sqF + pushF * 0.8) * 10) / 10;
+    dl = Math.round(sq * 1.18 * 10) / 10;
+    bp = Math.round(base * (pushF * 1.1) * 10) / 10;
+    pr = Math.round(bp * 0.62 * 10) / 10;
+    pu = 0;
+  }
+  return {
+    lv,
+    gender: segVal('genderSeg') || 'm',
+    squat: sq,
+    dead:  dl,
+    bench: bp,
+    press: pr,
+    pullup: pu,
+    run5k: toSec(g('run5k').value),
+    run10k:toSec(g('run10k').value),
+    race,
+    goal:  toSec(g('goal').value),
+    days:  +segVal('daysSeg') || 4,
+    dur:   +segVal('durSeg') || 75,
+    years: segVal('yearsSeg') || '1to2',
+    date:  (document.getElementById('raceDate')||{}).value || '',
+    st
+  };
+}
+function fillForm(p){
+  if(!p) return;
+  const g = id => document.getElementById(id);
+  g('squat').value = p.squat || '';
+  g('dead').value  = p.dead || '';
+  g('bench').value = p.bench || '';
+  g('press').value = p.press || '';
+  g('pullup').value= p.pullup || '';
+  if(p.run5k) g('run5k').value = fmt(p.run5k);
+  if(p.run10k) g('run10k').value = fmt(p.run10k);
+  if(p.goal) g('goal').value = fmt(p.goal);
+  g('raceDate').value = p.date || '';
+  const durNum = typeof p.dur === 'number' ? p.dur : (parseInt(p.dur, 10) || 75);
+  setSeg('daysSeg', p.days || 4);
+  setSeg('genderSeg', p.gender || 'm');
+  setSeg('durSeg', durNum);
+  setSeg('yearsSeg', (typeof p.years === 'string' && p.years) ? p.years : '1to2');
+  let rk = p.race || 'hyrox';
+  if(rk === 'none') rk = 'hybrid';
+  if(!RACES[rk]) rk = 'hyrox';
+  setSeg('raceSeg', rk);
+  tmpSt = Object.assign({}, p.st || {});
+  renderStationInputs();
+}
+
+/* ============ 核心计算 ============ */
+function analyze(p){
+  const pace5k = p.run5k ? p.run5k/5 : 0;           // 秒/公里
+  if(!pace5k) return null;
+
+  const R = raceOf(p);
+  const goal = p.goal || 90*60;
+  const racePace  = pace5k + 10;                     // 比赛配速
+  const thrPace   = pace5k + 20;                     // 阈值
+  const easyPace  = pace5k + 65;                     // Zone2
+
+  const runTotal  = R.seg * R.km * racePace;
+  const trans     = R.seg * R.trans;
+  const stationNet= Math.max(60, goal - runTotal - trans);
+
+  const list = R.keys.map(k => ({key:k, ...LIB[k], label:(R.lab && R.lab[k]) || LIB[k].label}));
+  const totalW = list.reduce((a,s)=>a+s.w,0);
+
+  const rows = list.map(s=>{
+    const budget = stationNet * (s.w/totalW);
+    const measured = (p.st && p.st[s.key]) ? p.st[s.key] : 0;
+    const g = p.gender === 'w' ? 'w' : 'm';
+    const bench = s.bm ? s.bm[g] : 0;
+    return {...s, budget, measured, gap: measured ? measured-budget : 0,
+      bench, gapBench: measured && bench ? measured-bench : 0};
+  });
+
+  const est = runTotal + trans + rows.reduce((a,r)=> a + (r.measured || r.budget), 0);
+
+  const effGap = r => r.bench > 0 ? r.gapBench : r.gap;
+  const ranked = rows.slice().sort((a,b)=> effGap(b) - effGap(a));
+  const hasData = rows.some(r=>r.measured);
+
+  return {race:R, pace5k, racePace, thrPace, easyPace, runTotal, trans, stationNet, rows, est, goal, ranked, hasData};
+}
+
+function phaseOf(w){ // w 从 1 开始
+  for(const i in PHASES){ const p = PHASES[i]; if(w>=p.from && w<=p.to) return +i; }
+  return 3;
+}
+// 阶段内逐周递增：把 lo→hi 平均分配到每一周
+function pctOf(w){
+  const pi = phaseOf(w);
+  const ph = PHASES[pi];
+  const span = ph.to - ph.from;
+  if(span === 0) return ph.hi;
+  const idx = w - ph.from;
+  return ph.lo + (ph.hi - ph.lo) * (idx / span);
+}
+function volsOf(sets){
+  const m = sets.match(/(\d+)\s*×\s*(\d+)/);
+  return m ? (+m[1]) * (+m[2]) : 0;
+}
+
+/* ============ 生成训练日 ============ */
+/* ============ 生成训练日 ============ */
+const DUR_COUNT = {45:4,60:5,75:6,90:7,105:8,120:8};
+
+function buildWeek(p, a, w){
+  const pi = phaseOf(w);
+  const ph = PHASES[pi];
+  const pct = pctOf(w);
+  const sq = SEQ.squat[pi], hg = SEQ.hinge[pi];
+  const ps = SEQ.push[pi], pu = SEQ.pull[pi], pr = SEQ.press[pi];
+  const lift = (base, name) => Math.round((base * (FACTOR[name]||1) * pct) / 2.5) * 2.5;
+  /* 1RM 未填（base=0）时不拼 @0kg，避免把假重量带进计划与吨位统计 */
+  const wtTag = (base, name) => { const wt = lift(base, name); return wt > 0 ? ` @ ${wt}kg` : ''; };
+  const base = DUR_COUNT[p.dur] || 6;
+  const cnt = pi === 3 ? Math.max(4, base - 1) : base;   // 减量周少一个动作，但不空
+  const n = p.days;
+
+  /* 辅助动作池：按周轮换，保证 12 周不会一直做同四个动作。
+     杠=杠铃 哑=哑铃 械=固定器械 绳=绳索 徒=徒手 —— 器械和孤立动作都在这里。 */
+  const LOWER_AUX = [
+    {g:'股四', ex:'保加利亚分腿蹲', rx:'3 × 8/侧', eq:'哑'},
+    {g:'股四', ex:'腿举（器械）', rx:'3 × 12', eq:'械'},
+    {g:'股四', ex:'腿屈伸（器械）', rx:'3 × 15', eq:'械'},
+    {g:'股四', ex:'哈克深蹲（器械）', rx:'3 × 10', eq:'械'},
+    {g:'股四', ex:'行走箭步蹲', rx:'3 × 12/侧', eq:'哑'},
+    {g:'后链', ex:'腿弯举（器械）', rx:'3 × 12', eq:'械'},
+    {g:'后链', ex:'臀推（器械）', rx:'3 × 12', eq:'械'},
+    {g:'后链', ex:'罗马尼亚硬拉', rx:'3 × 10', eq:'哑'},
+    {g:'后链', ex:'单腿罗马尼亚硬拉', rx:'3 × 10/侧', eq:'哑'},
+    {g:'小腿', ex:'提踵（器械）', rx:'4 × 15', eq:'械'},
+    {g:'小腿', ex:'单腿提踵', rx:'3 × 15/侧', eq:'徒'},
+    {g:'稳定', ex:'侧向箭步蹲', rx:'3 × 10/侧', eq:'徒'},
+    {g:'稳定', ex:'靠墙静蹲', rx:'3 × 45 秒', eq:'徒'},
+    {g:'核心', ex:'悬垂举腿', rx:'3 × 12', eq:'徒'},
+    {g:'核心', ex:'绳索卷腹', rx:'3 × 15', eq:'绳'}
+  ];
+  const UPPER_AUX = [
+    {g:'胸', ex:'器械夹胸', rx:'3 × 15', eq:'械'},
+    {g:'胸', ex:'哑铃飞鸟', rx:'3 × 12', eq:'哑'},
+    {g:'胸', ex:'上斜哑铃卧推', rx:'3 × 10', eq:'哑'},
+    {g:'胸', ex:'俯卧撑', rx:'3 × 最大次数', eq:'徒'},
+    {g:'胸', ex:'双杠臂屈伸', rx:'3 × 8–10', eq:'徒'},
+    {g:'背', ex:'坐姿划船（器械）', rx:'3 × 12', eq:'械'},
+    {g:'背', ex:'高位下拉（器械）', rx:'3 × 12', eq:'械'},
+    {g:'背', ex:'单臂哑铃划船', rx:'3 × 10/侧', eq:'哑'},
+    {g:'背', ex:'杠铃划船', rx:'3 × 10', eq:'杠'},
+    {g:'肩', ex:'面拉（绳索）', rx:'3 × 15', eq:'绳'},
+    {g:'肩', ex:'反向飞鸟（器械）', rx:'3 × 15', eq:'械'},
+    {g:'肩', ex:'哑铃侧平举', rx:'3 × 15', eq:'哑'},
+    {g:'二头', ex:'杠铃弯举', rx:'3 × 12', eq:'杠'},
+    {g:'二头', ex:'哑铃锤式弯举', rx:'3 × 12', eq:'哑'},
+    {g:'三头', ex:'绳索三头下压', rx:'3 × 15', eq:'绳'},
+    {g:'三头', ex:'窄距卧推', rx:'3 × 10', eq:'杠'}
+  ];
+  // 按肌群分组，每组取一个、组内按周轮换 —— 一天覆盖多个部位，不会连着练同一条链
+  const groupPick = (arr, k, seed) => {
+    const gs = [...new Set(arr.map(x => x.g))];
+    const out = [];
+    gs.forEach((g, i) => {
+      const items = arr.filter(x => x.g === g);
+      out.push(items[(seed + i * 2) % items.length]);
+    });
+    return out.slice(0, Math.max(2, Math.min(k, out.length)));
+  };
+  const auxK = () => Math.max(2, Math.min(cnt - 2, 5));
+
+  const lowerPool = () => [
+    {ex: sq, rx: `${ph.sets}${wtTag(p.squat, sq)}`, eq:'杠'},
+    {ex: hg, rx: `${ph.sets}${wtTag(p.dead, hg)}`, eq:'杠'},
+    ...groupPick(LOWER_AUX.filter(x => x.ex !== sq && x.ex !== hg), auxK(), w)
+  ];
+  const upperPool = () => [
+    {ex: ps, rx: `${ph.sets}${wtTag(p.bench, ps)}`, eq:'杠'},
+    {ex: pu, rx: pu === '负重引体' ? '4 × 5 加重（+5–10kg）' : `4 × ${Math.max(1, Math.round(p.pullup*0.8))} 次`, eq:'徒'},
+    {ex: pr, rx: `3 × 8${wtTag(p.press, pr)}`, eq:'杠'},
+    ...groupPick(UPPER_AUX.filter(x => x.ex !== ps && x.ex !== pu && x.ex !== pr), auxK(), w)
+  ];
+
+  const metconPool = () => {
+    if(pi===0) return [
+      {ex:'Zone2 匀速跑', rx:`40 分钟 @ ${fmt(a.easyPace)}/km`},
+      {ex:'划船 Zone2', rx:'20 分钟，桨频 22'},
+      {ex:'跑姿 / 步频练习', rx:'6 × 30 秒 @ 步频 180'},
+      {ex:'平板支撑', rx:'3 × 45 秒'},
+      {ex:'死虫', rx:'3 × 12/侧'},
+      {ex:'自行车 Zone2', rx:'30 分钟，低冲击替代'},
+      {ex:'踝关节活动度', rx:'3 × 10'}
+    ];
+    if(pi===1){
+      const rw = a.rows.find(r=>r.key==='row');
+      const r500 = rw ? (rw.measured || rw.budget)/2 : a.thrPace/2;
+      return [
+        {ex:'800m 阈值间歇', rx:`6 × 800m @ ${fmt(a.thrPace)}/km，休 90 秒`},
+        {ex:'划船 500m', rx:`4 × 500m @ ${fmt(r500)}，休 90 秒`},
+        {ex:'400m 重复跑', rx:`8 × 400m @ ${fmt(a.thrPace)}/km，休 60 秒`},
+        {ex:'悬垂举腿', rx:'3 × 12'},
+        {ex:'俄罗斯转体', rx:'3 × 20'},
+        {ex:'跳绳', rx:'5 × 60 秒，休 30 秒'},
+        {ex:'拉伸', rx:'10 分钟'}
+      ];
+    }
+    if(pi===2) return [
+      {ex:'1km 比赛配速', rx:`4 × 1km @ ${fmt(a.racePace)}/km，休 60 秒`},
+      {ex:'模拟组合', rx:'2 × (500m 跑 + 25 墙球)'},
+      {ex:'墙球 EMOM', rx:'5 分钟，每分钟 12 次'},
+      {ex:'雪橇短冲', rx:'6 × 20m 比赛重量，休 60 秒'},
+      {ex:'平板支撑', rx:'3 × 60 秒'},
+      {ex:'侧桥', rx:'3 × 30 秒/侧'},
+      {ex:'拉伸', rx:'10 分钟'}
+    ];
+    return [
+      {ex:'轻松跑', rx:`25 分钟 @ ${fmt(a.easyPace)}/km`},
+      {ex:'走跑交替', rx:'20 分钟，1 分钟跑 1 分钟走'},
+      {ex:'平板支撑', rx:'2 × 30 秒'},
+      {ex:'死虫', rx:'2 × 10/侧'},
+      {ex:'全身拉伸', rx:'15 分钟'},
+      {ex:'呼吸练习', rx:'5 分钟 4-7-8'}
+    ];
+  };
+
+  const top3 = a.ranked.slice(0,3);
+  const specialPool = () => [
+    ...top3.map(s=>({ex:`${s.name} 专项`, rx: s.rx})),
+    {ex:'弱项连做', rx:'2 轮：前两个弱项连做，按比赛间隔走'},
+    {ex:'握力 / 前臂', rx:'3 × 农夫握持 30 秒'},
+    {ex:'技术复盘', rx:'录像 1–2 组，看节奏与转换'}
+  ];
+
+  const recoveryPool = () => [
+    {ex:'髋 + 胸椎活动度', rx:'15 分钟'},
+    {ex:'轻松走', rx:'30 分钟，心率 Zone1'},
+    {ex:'髋部 90/90', rx:'3 × 8/侧'},
+    {ex:'胸椎旋转', rx:'3 × 10/侧'},
+    {ex:'泡沫轴', rx:'10 分钟，重点股四与小腿'},
+    {ex:'呼吸练习', rx:'5 分钟 4-7-8'}
+  ];
+
+  const take = (pool, k) => pool.slice(0, Math.max(4, Math.min(k, pool.length)));
+  const fullPool = () => take([...lowerPool().slice(0,2), ...upperPool().slice(0,3), lowerPool().slice(-1)[0]], cnt);
+
+  const makeDay = (name, title, tag, items, note) => ({d:name, t:title, tag, items, note});
+
+  const lower = (dn='周一') => makeDay(dn,'力量 · 下肢','STRENGTH', take(lowerPool(), cnt), `${ph.name}｜主项按 ${ph.sets} 执行，组间休息 2–3 分钟`);
+  const upper = (dn='周五') => makeDay(dn,'力量 · 上肢','STRENGTH', take(upperPool(), cnt), `${ph.name}｜主项 ${ph.sets}，辅助动作练到接近力竭`);
+  const metcon = (dn='周三') => makeDay(dn,'混氧 · 阈值','CONDITIONING', take(metconPool(), cnt), `${ph.metcon}`);
+  const special = (dn='周六') => makeDay(dn,'专项 · 弱项','SKILL', take(specialPool(), cnt), `当前最大差距：${a.ranked[0].name}，${a.hasData ? '实测超预算 ' + fmt(Math.abs(a.ranked[0].gap)) : '按默认优先级排序'}`);
+  const recovery = (dn='周日') => makeDay(dn,'恢复 · 灵活性','RECOVERY', take(recoveryPool(), cnt), '心率控制在 Zone1，不追强度');
+  const longRun = (dn='周日') => makeDay(dn,'长有氧 · Zone2','ENDURANCE', [
+    {ex:'长距离慢跑', rx:`${60 + (pi===2?0:20)} 分钟 @ ${fmt(a.easyPace)}/km`},
+    {ex:'核心循环', rx:'2 轮：平板 45 秒 + 死虫 12/侧'},
+    {ex:'拉伸', rx:'10 分钟'}
+  ], '全程能说完整句子，不追配速');
+  const skillDay = (dn='周四') => makeDay(dn,'技术 · 灵活性','SKILL', [
+    {ex:'过头蹲（轻）', rx:'3 × 5 @ 空杆–30kg'},
+    {ex:'抓举平衡 / 高翻技术', rx:'5 × 3，轻重量'},
+    {ex:'踝 + 髋活动度', rx:'10 分钟'},
+    {ex:'核心', rx:'3 × 悬垂举腿 12'}
+  ], '只用轻重量，练轨迹不练强度');
+
+  const days = [];
+  if(n <= 2){
+    days.push(makeDay('周二','全身力量 + 短混氧','MIXED', fullPool(), '一周只有两次，全身覆盖优先，每个动作都要练到'));
+    days.push(longRun('周日'));
+  } else if(n === 3){
+    days.push(lower('周一'));
+    days.push(metcon('周三'));
+    days.push(upper('周六'));
+  } else if(n === 4){
+    days.push(lower('周一')); days.push(metcon('周三')); days.push(upper('周五')); days.push(special('周六'));
+  } else if(n === 5){
+    days.push(lower('周一')); days.push(metcon('周三')); days.push(upper('周五')); days.push(special('周六')); days.push(recovery('周日'));
+  } else if(n === 6){
+    days.push(lower('周一')); days.push(skillDay('周二')); days.push(metcon('周三'));
+    days.push(upper('周四')); days.push(special('周五')); days.push(recovery('周日'));
+  } else {
+    days.push(lower('周一')); days.push(skillDay('周二')); days.push(metcon('周三'));
+    days.push(upper('周四')); days.push(special('周五')); days.push(longRun('周六')); days.push(recovery('周日'));
+  }
+
+  return {w, pi, ph, days};
+}
+
+
+
+/* ============ WOD 库 ============ */
+/* lv：1 入门 / 2 进阶 / 3 硬核；t：标签 */
+const WODS = [
+{n:'Fran',c:'21-15-9 计时',t:['混氧','短狠'],lv:3,d:'3–8 分',
+ m:[['杠铃推举深蹲 Thruster','21-15-9'],['引体向上','21-15-9']],rx:'男 43kg / 女 30kg',
+ sc:'推举降到空杆 20kg，引体改弹力带或澳式引体（脚跟着地）'},
+{n:'Cindy',c:'20 分钟 AMRAP',t:['混氧','耐力'],lv:1,d:'20 分',
+ m:[['引体向上','5'],['俯卧撑','10'],['徒手深蹲','15']],rx:'纯自重，只看轮数',
+ sc:'引体改澳式引体，俯卧撑可跪姿，目标 8 轮以上'},
+{n:'Helen',c:'3 轮计时',t:['混氧'],lv:2,d:'10–15 分',
+ m:[['400 米跑','1'],['壶铃摆','21（男16kg/女12kg）'],['引体向上','12']],rx:'壶铃 16 / 12kg',
+ sc:'跑量降到 300 米，壶铃 12 / 8kg，引体改澳式'},
+{n:'Diane',c:'21-15-9 计时',t:['力量','短狠'],lv:3,d:'6–12 分',
+ m:[['硬拉','21-15-9'],['倒立撑','21-15-9']],rx:'硬拉 102 / 70kg',
+ sc:'硬拉降到体重 0.8 倍，倒立撑改哑铃推举或俯身派克撑'},
+{n:'Elizabeth',c:'21-15-9 计时',t:['力量'],lv:3,d:'8–15 分',
+ m:[['翻站 Clean','21-15-9（男61kg/女43kg）'],['吊环臂屈伸','21-15-9']],rx:'翻站 61 / 43kg',
+ sc:'翻站降到 40kg 做高翻，吊环改凳上臂屈伸'},
+{n:'Grace',c:'30 次计时',t:['力量','短狠'],lv:3,d:'3–7 分',
+ m:[['借力挺举 Clean & Jerk','30（男61kg/女43kg）']],rx:'61 / 43kg',
+ sc:'降到 40kg 做借力推举，或改 20 次'},
+{n:'Karen',c:'150 球计时',t:['混氧','耐力'],lv:2,d:'8–20 分',
+ m:[['墙球 Wall Ball','150（男9kg/女6kg，靶高 3 米）']],rx:'9 / 6kg',
+ sc:'球降到 6 / 4kg，分 5 组每组 30，组间休 1 分钟'},
+{n:'Annie',c:'50-40-30-20-10 计时',t:['体操','短狠'],lv:2,d:'6–12 分',
+ m:[['双摇跳绳 Double-under','50-40-30-20-10'],['仰卧起坐','50-40-30-20-10']],rx:'纯自重',
+ sc:'双摇改单摇（次数×2），仰卧起坐改卷腹'},
+{n:'Jackie',c:'计时',t:['混氧'],lv:2,d:'10–15 分',
+ m:[['划船','1000 米'],['杠铃推举','50（男20kg）'],['引体向上','30']],rx:'空杆 20kg',
+ sc:'划船 500 米，推举 15kg，引体改澳式 30 次'},
+{n:'Nancy',c:'5 轮计时',t:['混氧'],lv:2,d:'15–20 分',
+ m:[['400 米跑','1'],['过头深蹲','15（男43kg/女30kg）']],rx:'43 / 30kg',
+ sc:'跑 300 米，过头深蹲改前蹲 20kg 或徒手过头蹲'},
+{n:'Angie',c:'100-100-100-100 计时',t:['体操','耐力'],lv:3,d:'20–35 分',
+ m:[['引体向上','100'],['俯卧撑','100'],['仰卧起坐','100'],['徒手深蹲','100']],rx:'纯自重，一次做完一项再换下一项',
+ sc:'各改 50，引体用弹力带，俯卧撑可跪姿'},
+{n:'Barbara',c:'5 轮计时',t:['体操','耐力'],lv:2,d:'25–35 分',
+ m:[['引体向上','20'],['俯卧撑','30'],['仰卧起坐','40'],['徒手深蹲','50']],rx:'纯自重，每轮之间精确休 3 分钟',
+ sc:'轮次改 3 轮，引体改澳式，俯卧撑跪姿'},
+{n:'Chelsea',c:'EMOM 30 分钟',t:['体操','耐力'],lv:1,d:'30 分',
+ m:[['引体向上','5 / 每分钟'],['俯卧撑','10 / 每分钟'],['徒手深蹲','15 / 每分钟']],rx:'纯自重，每分钟开始做，做完歇到下一分钟',
+ sc:'引体改澳式，俯卧撑改跪姿，撑不住就 20 分钟'},
+{n:'Mary',c:'20 分钟 AMRAP',t:['体操'],lv:3,d:'20 分',
+ m:[['倒立撑','5'],['单腿蹲（手枪蹲）','10 交替'],['引体向上','15']],rx:'纯自重',
+ sc:'倒立撑改派克撑，单腿蹲扶箱做，引体改澳式'},
+{n:'Eva',c:'5 轮计时',t:['混氧','耐力'],lv:3,d:'35–50 分',
+ m:[['800 米跑','1'],['壶铃摆','30（男32kg/女24kg）'],['引体向上','30']],rx:'壶铃 32 / 24kg',
+ sc:'跑 400 米，壶铃 16kg，引体改澳式，轮次改 3 轮'},
+{n:'Kelly',c:'5 轮计时',t:['混氧','箱类'],lv:2,d:'25–35 分',
+ m:[['400 米跑','1'],['跳箱 Box Jump','30（24 寸 / 60cm）'],['墙球','30（9kg）']],rx:'箱高 60cm，球 9kg',
+ sc:'跑 300 米，箱改走箱 Step-up，球改 6kg'},
+{n:'Isabel',c:'30 次计时',t:['力量','短狠'],lv:3,d:'3–8 分',
+ m:[['抓举 Snatch','30（男61kg/女43kg）']],rx:'61 / 43kg',
+ sc:'降到 40kg 做高抓，或改用哑铃抓举'},
+{n:'Amanda',c:'9-7-5 计时',t:['体操','力量'],lv:3,d:'8–15 分',
+ m:[['双力臂 Muscle-up','9-7-5'],['蹲抓 Squat Snatch','9-7-5（男61kg）']],rx:'61 / 43kg',
+ sc:'双力臂改跳上箱 + 俯卧撑过渡，蹲抓降到 30kg 或改高抓'},
+{n:'Murph',c:'计时（可穿背心）',t:['耐力'],lv:3,d:'35–60 分',
+ m:[['1 英里跑','1609 米'],['引体向上','100'],['俯卧撑','200'],['徒手深蹲','300'],['1 英里跑','1609 米']],rx:'男 9kg 背心 / 女 6kg（可选）',
+ sc:'拆分做：20 组 5/10/15 循环；或各减半、跑 800 米'},
+{n:'JT',c:'21-15-9 计时',t:['体操'],lv:2,d:'10–18 分',
+ m:[['倒立撑','21-15-9'],['吊环臂屈伸','21-15-9'],['俯卧撑','21-15-9']],rx:'纯自重',
+ sc:'倒立撑改派克撑，吊环改凳上臂屈伸，俯卧撑可跪姿'},
+{n:'Morrison',c:'50-40-30-20-10 计时',t:['混氧','耐力'],lv:2,d:'20–30 分',
+ m:[['墙球','50-40-30-20-10（9kg）'],['跳箱','同次数（60cm）'],['壶铃摆','同次数（16kg）']],rx:'球 9kg / 箱 60cm / 壶铃 16kg',
+ sc:'次数各除以 2，箱改走箱，壶铃 12kg'},
+{n:'Small',c:'3 轮计时',t:['混氧','耐力'],lv:3,d:'30–45 分',
+ m:[['划船','1000 米'],['波比','50'],['跳箱','50（60cm）'],['800 米跑','1']],rx:'箱 60cm',
+ sc:'划船 500 米，波比 25，箱改走箱，跑 400 米'},
+{n:'Fight Gone Bad',c:'5 站×1 分钟×3 轮',t:['混氧','耐力'],lv:2,d:'17 分',
+ m:[['墙球（计次数）','1 分钟'],['宽距硬拉高翻 SDHP（34kg）','1 分钟'],['跳箱 50cm（计次数）','1 分钟'],['杠铃推举（34kg）','1 分钟'],['划船（计卡路里）','1 分钟']],rx:'杠铃 34kg（男）',
+ sc:'杠铃 20kg，跳箱改走箱，划船改风阻单车'},
+{n:'Jack',c:'20 分钟 AMRAP',t:['混氧'],lv:2,d:'20 分',
+ m:[['杠铃推举','10（52kg）'],['壶铃摆','10（24kg）'],['跳箱','10（60cm）']],rx:'52kg / 24kg / 60cm',
+ sc:'推举 30kg，壶铃 16kg，跳箱改走箱'},
+{n:'Wilmot',c:'6 轮计时',t:['体操'],lv:3,d:'20–30 分',
+ m:[['徒手深蹲','50'],['吊环臂屈伸','25']],rx:'纯自重',
+ sc:'改 4 轮，深蹲 30，吊环改凳上臂屈伸'},
+{n:'Hammer',c:'5 轮计时（组间休 90 秒）',t:['力量'],lv:3,d:'20–30 分',
+ m:[['高翻 Power Clean','5（61kg）'],['前蹲','10（61kg）'],['借力挺','5（61kg）'],['引体向上','20']],rx:'61kg',
+ sc:'杠铃降到 40kg，引体改澳式，轮次 3 轮'},
+
+/* —— 专项组合（非官方基准，为赛事站点设计） —— */
+{n:'跳箱阶梯',c:'10-20-30 逐级升箱',t:['箱类','短狠'],lv:1,d:'8–12 分',
+ m:[['跳箱（低箱 40cm）','10'],['跳箱（中箱 50cm）','20'],['跳箱（高箱 60cm）','30']],rx:'自选箱高，落箱要轻',
+ sc:'全改走箱 Step-up，或箱高各降一档'},
+{n:'波比过箱 AMRAP',c:'12 分钟 AMRAP',t:['波比','箱类'],lv:2,d:'12 分',
+ m:[['波比过箱 Burpee Box Jump-over','8'],['徒手深蹲','12']],rx:'箱高 50–60cm，两脚起跳，落在箱另一侧',
+ sc:'改波比走上箱（Burpee Box Step-over），箱高 40cm'},
+{n:'负重走箱',c:'4 轮（每腿 20 步）',t:['箱类'],lv:1,d:'10–15 分',
+ m:[['哑铃走箱 Step-up','20 步/腿（男 2×12kg）'],['农夫走','40 米']],rx:'哑铃 12kg/手',
+ sc:'哑铃 8kg，箱高 40cm，步数减半'},
+{n:'四式箱混编',c:'4 轮计时',t:['箱类','混氧'],lv:2,d:'15–20 分',
+ m:[['跳箱 Box Jump','15（50cm）'],['走箱 Box Step-up','15（交替）'],['过箱 Box Jump-over','15'],['波比过箱','10']],rx:'箱高 50cm',
+ sc:'跳箱全改走箱，过箱改进出箱，波比过箱改波比不越箱'},
+{n:'雪橇推拉',c:'6 组（组间休 90 秒）',t:['站点','力量'],lv:2,d:'15–20 分',
+ m:[['雪橇推 Sled Push','25 米（男 100kg）'],['雪橇拉 Sled Pull','25 米（男 75kg）']],rx:'推 100kg / 拉 75kg',
+ sc:'重量减到 50 / 40kg，距离 15 米，或改原地推墙'},
+{n:'推雪橇 + 农夫走',c:'4 轮计时',t:['站点'],lv:2,d:'12–18 分',
+ m:[['雪橇推','25 米'],['农夫走','50 米（男 2×24kg）'],['沙袋搬运','25 米']],rx:'雪橇 80kg / 农夫 24kg',
+ sc:'距离各减半，重量降 30%'},
+{n:'双机间歇',c:'8 组',t:['站点','混氧'],lv:2,d:'16–20 分',
+ m:[['划船','250 米'],['滑雪机 SkiErg','250 米']],rx:'两组之间不休息',
+ sc:'各改 150 米，组数 6 组'},
+{n:'墙球 + 药球',c:'5 轮计时',t:['站点','混氧'],lv:1,d:'10–14 分',
+ m:[['墙球','20（9kg）'],['药球抛射','20（9kg）']],rx:'球 9 / 6kg',
+ sc:'各 12 次，球改 6kg'},
+{n:'沙袋 + 箭步',c:'6 轮计时',t:['站点'],lv:2,d:'15–20 分',
+ m:[['沙袋搬运','50 米（男 20kg）'],['哑铃箭步蹲走','40 米（2×10kg）']],rx:'沙袋 20kg / 哑铃 10kg',
+ sc:'距离减半，沙袋 10kg，箭步改原地分腿蹲'},
+{n:'波比五连',c:'5 轮计时',t:['波比','混氧'],lv:2,d:'12–18 分',
+ m:[['波比 Burpee','10'],['波比跳远 Burpee Broad Jump','10（1 米）'],['波比过箱','10（50cm）'],['波比引体 Burpee Pull-up','10'],['杠铃波比 Bar-facing Burpee','10（20kg）']],rx:'箱 50cm / 杠 20kg',
+ sc:'减成 3 种（普通波比 + 波比过箱 + 杠铃波比），各 6 次；波比可做“起身不跳”的 up-down'},
+{n:'走箱三式',c:'3 轮计时',t:['箱类','混氧'],lv:1,d:'12–16 分',
+ m:[['上箱 Box Step-up','20 步/腿（50cm）'],['走箱过 Box Step-over','20 次'],['负重上箱','20 步/腿（哑铃 8kg）']],rx:'箱高 50cm',
+ sc:'箱高 40cm，负重去掉，步数减半'},
+{n:'Hyrox 迷你模拟',c:'4 段计时',t:['站点','耐力'],lv:3,d:'20–25 分',
+ m:[['1 公里跑','1'],['滑雪机','1000 米'],['雪橇推','25 米（100kg）'],['波比跳箱行进','80 米']],rx:'按比赛标准重量',
+ sc:'跑 800 米，滑雪 500 米，雪橇 50kg，波比行进改波比 40 次'},
+{n:"Hyrox 混双",c:"全程模拟 · 8 跑 8 站",t:["站点","长时","混氧"],lv:3,d:"50–65 分",
+ m:[["1 公里跑","1"],["滑雪机 SkiErg","1000 米"],["1 公里跑","1"],["雪橇推","2 × 50 米（152kg）"],
+    ["1 公里跑","1"],["雪橇拉","2 × 50 米（103kg）"],["1 公里跑","1"],["波比跳远 BBJ","80 米"],
+    ["1 公里跑","1"],["划船","1000 米"],["1 公里跑","1"],["农夫走","200 米（2×24kg）"],
+    ["1 公里跑","1"],["沙袋箭步","100 米（20kg）"],["1 公里跑","1"],["墙球","100 次（6kg 到 3 米）"]],
+ rx:"混双用男子重量：推 152 / 拉 103 / 农夫 2×24 / 沙袋 20 / 墙球 6kg 到 3m；两人分担站点，8 段跑一起跑",
+ sc:"跑步改 800 米；雪橇各降 20kg；墙球分 5 组每组 20；不适合硬扛就拆成「跑 4 段 + 站 4 站」"},
+{n:"Linda",c:"10-9-8-7-6-5-4-3-2-1 计时",t:["力量","长时"],lv:3,d:"25–40 分",m:[["硬拉 1.5×体重","10-1"],["卧推 1×体重","10-1"],["翻站 0.75×体重","10-1"]],rx:"硬拉 1.5×体重 / 卧推 1×体重 / 翻站 0.75×体重",sc:"80kg 就是 120/80/60；宁轻 10kg 也别中途崩"},
+{n:"Maggie",c:"5 轮计时",t:["体操","长时"],lv:3,d:"25–35 分",m:[["倒立俯卧撑","20"],["引体向上","40"],["单腿蹲（交替）","60"]],rx:"标准 Rx，无重量",sc:"引体改弹力带或划船；单腿蹲扶架，蹲不到底坐箱"},
+{n:"Hope",c:"3 轮 FGB 格式",t:["混氧","体操"],lv:3,d:"18–24 分",m:[["波比","1 分/站"],["抓举 34kg","1 分/站"],["跳箱 60cm","1 分/站"],["推举 34kg","1 分/站"],["胸触杠引体","1 分/站"]],rx:"男 34kg / 女 25kg，箱高 60/50cm",sc:"抓举换单臂哑铃；C2B 改普通引体"},
+{n:"Barbara Ann",c:"5 轮计时",t:["体操","长时"],lv:3,d:"30–40 分",m:[["倒立俯卧撑","20"],["硬拉 61/43kg","30"],["仰卧起坐","40"],["双摇","50"]],rx:"男 61kg / 女 43kg，轮间休 3 分",sc:"HSPU 改肩推；双摇改单摇 100"},
+{n:"Lyla",c:"10-9-…-1 计时",t:["体操","力量"],lv:3,d:"15–25 分",m:[["双力臂","10-1"],["自体重翻站推","10-1"]],rx:"自体重（男 60–70kg / 女 40–45kg）",sc:"双力臂改「引体+推上杠」；翻站推降到 60% 体重"},
+{n:"Ellen",c:"3 轮计时",t:["举重","混氧"],lv:2,d:"12–18 分",m:[["波比","20"],["哑铃抓举","21"],["哑铃推举","12"]],rx:"男 22.5kg / 女 15kg 哑铃",sc:"哑铃各降 5kg；波比改走步式"},
+{n:"Andi",c:"计时",t:["举重","长时"],lv:3,d:"25–35 分",m:[["悬垂高抓","100"],["推举","100"],["相扑硬拉高拉","100"],["前蹲","100"]],rx:"男 29kg / 女 20kg",sc:"每项拆 5×20，多停别断；重量降 20%"},
+{n:"Lane",c:"5 轮最大次数",t:["举重","体操"],lv:3,d:"20–28 分",m:[["悬垂高抓 0.75×体重","最大次数"],["倒立俯卧撑","最大次数"]],rx:"悬垂高抓 0.75×体重",sc:"抓举降到 0.6×体重；HSPU 改屈膝俯卧撑"},
+{n:"DT",c:"5 轮计时",t:["举重","力量"],lv:3,d:"12–20 分",m:[["硬拉","12"],["悬垂高翻","9"],["借力推","6"]],rx:"男 70kg / 女 47.5kg，同一根杠不落地",sc:"降到 60/40kg，全程不落地"},
+{n:"Randy",c:"计时",t:["举重","短狠"],lv:2,d:"8–15 分",m:[["抓举","75 次"]],rx:"男 34kg / 女 25kg",sc:"降到 25/15kg；每 10 次停一次"},
+{n:"Chad 1000X",c:"计时",t:["箱类","长时"],lv:2,d:"40–70 分",m:[["负重上箱 50cm","1000 次"]],rx:"男 20kg / 女 15kg，箱高 50cm",sc:"不负重做 500 次；箱高降 10cm"},
+{n:"Nate",c:"20 分钟 AMRAP",t:["体操","混氧"],lv:3,d:"20 分",m:[["双力臂","2"],["倒立俯卧撑","4"],["壶铃摆 32kg","8"]],rx:"壶铃 32kg（2 pood）",sc:"双力臂改「引体+推上杠」；壶铃 24kg"},
+{n:"Michael",c:"3 轮计时",t:["耐力","混氧"],lv:1,d:"20–28 分",m:[["800m 跑","800m"],["背伸展","50"],["仰卧起坐","50"]],rx:"标准 Rx",sc:"跑改 600m；背伸展改臀桥 25 次"},
+{n:"Josh",c:"计时",t:["举重","体操"],lv:3,d:"15–22 分",m:[["过头蹲 43kg","21-15-9"],["引体向上","42-30-18"]],rx:"男 43kg",sc:"过头蹲改前蹲；引体用弹力带"},
+{n:"Badger",c:"3 轮计时",t:["举重","耐力"],lv:3,d:"25–35 分",m:[["蹲翻 43kg","30"],["引体向上","30"],["800m 跑","800m"]],rx:"男 43kg / 女 30kg",sc:"蹲翻降到 30kg；引体拆 6×5"},
+{n:"Bulger",c:"10 轮计时",t:["混氧","体操"],lv:3,d:"25–35 分",m:[["150m 跑","150m"],["胸触杠引体","7"],["前蹲 61kg","7"],["倒立俯卧撑","7"]],rx:"男 61kg / 女 43kg",sc:"减到 5 轮；C2B 改普通引体"},
+{n:"Glen",c:"计时",t:["长时","混氧"],lv:3,d:"35–50 分",m:[["挺举 61kg","30"],["1 英里跑","1 英里"],["爬绳 4.5m","10"],["1 英里跑","1 英里"],["波比","100"]],rx:"男 61kg / 女 43kg",sc:"挺举降 50kg；爬绳 3 趟；波比 60 次"},
+{n:"Tommy V",c:"计时",t:["举重","体操"],lv:3,d:"15–25 分",m:[["推举 52kg","21-15-9"],["爬绳 4.5m","12-9-6"]],rx:"男 52kg / 女 35kg，绳 4.5m",sc:"推举降 40kg；爬绳改「躺拉站起」"},
+{n:"Jerry",c:"计时",t:["耐力","混氧"],lv:2,d:"25–35 分",m:[["1 英里跑","1 英里"],["2000m 划船","2000m"],["1 英里跑","1 英里"]],rx:"标准 Rx",sc:"划船改 1500m；跑改 1.2km"},
+{n:"Holleyman",c:"30 轮计时",t:["混氧","长时"],lv:3,d:"30–45 分",m:[["墙球 9kg","5"],["倒立俯卧撑","3"],["高翻 61kg","1"]],rx:"男 61kg / 女 43kg",sc:"减到 15 轮；高翻降 45kg"},
+{n:"Rankel",c:"20 分钟 AMRAP",t:["混氧","力量"],lv:3,d:"20 分",m:[["硬拉 102kg","6"],["波比引体","7"],["壶铃摆 24kg","10"],["200m 跑","200m"]],rx:"男 102kg / 女 70kg",sc:"硬拉降 80kg；波比引体改波比+划船"},
+{n:"Whitten",c:"5 轮计时",t:["混氧","长时"],lv:3,d:"35–45 分",m:[["波比","22"],["墙球 9kg","22"],["壶铃摆 24kg","22"],["跳箱 60cm","22"],["400m 跑","400m"]],rx:"男 9kg 墙球 / 24kg 壶铃",sc:"减到 3 轮；箱高降 10cm"},
+{n:"Kalsu",c:"计时",t:["举重","长时"],lv:3,d:"30–45 分",m:[["推举 61kg","100"],["波比","每分开头 5 次"]],rx:"男 61kg / 女 43kg",sc:"推举降 45kg；波比改 3 次"},
+{n:"The Seven",c:"7 轮计时",t:["长时","力量"],lv:3,d:"35–50 分",m:[["倒立俯卧撑","7"],["推举 61kg","7"],["膝触肘","7"],["硬拉 111kg","7"],["波比","7"],["壶铃摆 32kg","7"],["引体向上","7"]],rx:"男 61kg 推举 / 111kg 硬拉",sc:"减到 4 轮；硬拉降 85kg"},
+{n:"Open 11.6",c:"7 分钟 AMRAP",t:["短狠","举重"],lv:3,d:"7 分",m:[["推举 45kg","3 起每轮 +3"],["胸触杠引体","3 起每轮 +3"]],rx:"男 45kg / 女 30kg",sc:"推举降 35kg；C2B 改普通引体"},
+{n:"Open 14.1",c:"10 分钟 AMRAP",t:["短狠","耐力"],lv:2,d:"10 分",m:[["双摇","30"],["抓举 34kg","15"]],rx:"男 34kg / 女 25kg",sc:"双摇改单摇 60；抓举降 25kg"},
+{n:"Open 17.5",c:"10 轮计时",t:["短狠","举重"],lv:2,d:"10–15 分",m:[["推举 43kg","9"],["双摇","35"]],rx:"男 43kg / 女 30kg",sc:"推举降 30kg；双摇改单摇 70"},
+{n:"Open 19.2",c:"8 分钟 AMRAP",t:["长时","体操"],lv:3,d:"8 分",m:[["膝触肘","25"],["双摇","50"],["蹲翻","15 起每轮 +5kg"]],rx:"男起 38kg / 女起 25kg",sc:"T2B 改抬膝；双摇改单摇 100"},
+{n:"雪橇推 5×25m",c:"5 组间歇",t:["站点","力量"],lv:2,d:"12–18 分",m:[["推雪橇 25m","5 组"]],rx:"比赛重量 +10%，组间休 3–5 分",sc:"降 20kg；组间休 4 分"},
+{n:"雪橇拉 5×25m",c:"5 组间歇",t:["站点","力量"],lv:2,d:"12–18 分",m:[["拉雪橇 25m","5 组"]],rx:"比赛重量，组间休 3–5 分",sc:"降 20kg；改手握绳站姿拉"},
+{n:"JAGGER",c:"20 分钟 AMRAP",t:["混氧","站点"],lv:3,d:"20 分",m:[["400m 跑","400m"],["波比","15"],["负重箭步","20"]],rx:"双哑铃各 20kg",sc:"哑铃各 12.5kg；箭步改原地"},
+{n:"Row Engine",c:"20 分钟 AMRAP",t:["混氧","站点"],lv:2,d:"20 分",m:[["400m 划船","400m"],["墙球 9kg","15"],["农夫走","200m"]],rx:"墙球男 9kg / 女 6kg",sc:"划船 300m；墙球 10 次"},
+{n:"雪橇双机",c:"三段计时",t:["站点","耐力"],lv:3,d:"25–35 分",m:[["推雪橇 50m","4 组休 1 分"],["2000m 划船或滑雪","1 组"],["农夫走 1 分钟","4 组"]],rx:"推雪橇比赛重量",sc:"推雪橇降 20kg；划船 1500m"},
+{n:"三站循环",c:"4 轮计时",t:["站点","混氧"],lv:2,d:"15–22 分",m:[["400m 划船","400m"],["推雪橇 25m","25m"],["拉雪橇 25m","25m"]],rx:"比赛重量",sc:"重量降 20%；划船 300m"},
+{n:"推雪橇→跑",c:"4 轮计时",t:["站点","混氧"],lv:3,d:"16–24 分",m:[["推雪橇 25m","25m"],["400m 跑","400m"]],rx:"中等负重，跑用比赛配速",sc:"重量降 20kg；跑 300m"},
+{n:"墙球→跑",c:"4 轮计时",t:["站点","混氧"],lv:2,d:"14–20 分",m:[["墙球 9kg","30"],["500m 跑","500m"]],rx:"男 9kg / 女 6kg",sc:"墙球 20 次；跑 400m"},
+{n:"BBJ→跑",c:"4 轮计时",t:["波比","混氧"],lv:3,d:"16–22 分",m:[["波比跳远","20"],["400m 跑","400m"]],rx:"标准 Burpee Broad Jump",sc:"波比 15 次；跳远改原地波比"},
+{n:"划船→跑",c:"5 轮计时",t:["站点","耐力"],lv:2,d:"22–30 分",m:[["500m 划船","500m"],["400m 跑","400m"]],rx:"划船 Z3 强度",sc:"划船 400m；跑 300m"},
+{n:"农夫走→跑",c:"5 轮计时",t:["站点","力量"],lv:2,d:"20–28 分",m:[["100m 农夫走","100m"],["400m 跑","400m"]],rx:"男 2×24kg / 女 2×16kg",sc:"各降 6kg；走 50m"},
+{n:"滑雪→跑",c:"5 轮计时",t:["站点","耐力"],lv:2,d:"20–28 分",m:[["500m 滑雪","500m"],["400m 跑","400m"]],rx:"滑雪 Z3 强度",sc:"滑雪 400m；跑 300m"},
+{n:"Heavy Half",c:"4 组长间歇",t:["站点","耐力"],lv:3,d:"40–55 分",m:[["1km 跑","4 组"],["推+拉雪橇+BBJ+墙球","站间插入"]],rx:"负重比比赛重 10%",sc:"负重降回比赛重量；跑 800m"},
+{n:"DEKA FIT 全模拟",c:"计时",t:["站点","长时"],lv:3,d:"55–75 分",m:[["500m 跑 + Z1–Z10","全套"]],rx:"按 DEKA FIT 官方负重",sc:"减到 5 个 Zone；负重降一档"},
+{n:"DEKA MILE",c:"计时",t:["站点","混氧"],lv:2,d:"25–35 分",m:[["160m 跑 + Z1–Z10","全套"]],rx:"按 DEKA MILE 官方负重",sc:"减到 5 个 Zone"},
+{n:"Gateway 冲刺",c:"计时",t:["站点","短狠"],lv:3,d:"18–26 分",m:[["Z7 风阻 25 卡","1"],["Z8 死球过墙 20","1"],["Z9 雪橇推拉 100m","1"],["Z10 RAM 波比 20","1"],["每站前 500m 跑","4 段"]],rx:"官方负重",sc:"减到 2 站；跑 300m"},
+{n:"DEKA 前半程",c:"计时",t:["站点","混氧"],lv:2,d:"22–30 分",m:[["Z1 箭步→Z5 滑雪","连做 5 站"],["每站前 500m 跑","5 段"]],rx:"官方负重",sc:"每站前跑 300m；负重降一档"},
+{n:"终结双站",c:"计时",t:["站点","短狠"],lv:3,d:"10–14 分",m:[["500m 跑","1"],["Z9 雪橇推拉 100m","1"],["500m 跑","1"],["Z10 RAM 波比 20","1"]],rx:"官方负重",sc:"雪橇距离减半；波比 12 次"},
+{n:"RAM 箭步→跑",c:"5 轮计时",t:["站点","混氧"],lv:2,d:"18–24 分",m:[["RAM 后撤箭步","30"],["500m 跑","500m"]],rx:"RAM 男 2×10kg / 女 2×5kg",sc:"箭步 20 次；跑 400m"},
+{n:"40 分钟 EMOM",c:"EMOM 40 分钟",t:["EMOM","耐力"],lv:3,d:"40 分",m:[["奇数分 5 硬拉 + 10 墙球","每分"],["偶数分 12 卡风阻 + 8 波比","每分"]],rx:"硬拉 60% 1RM",sc:"减到 20 分钟"},
+{n:"背蹲 5×5 + 收尾",c:"力量 + 代谢",t:["力量"],lv:2,d:"35–45 分",m:[["背蹲","5×5"],["10 分钟 AMRAP 前蹲+箱跳","收尾"]],rx:"背蹲 @75% 1RM",sc:"背蹲 @65%；收尾改 6 分钟"},
+{n:"硬拉 EMOM",c:"EMOM 10 分钟",t:["EMOM","力量"],lv:2,d:"10 分",m:[["硬拉 前 5 分","每分 6 次"],["硬拉 后 5 分","每分 4 次"]],rx:"前段 @70% / 后段 @80% 1RM",sc:"全程 @65%，每分 5 次"},
+{n:"单侧下肢 + 农夫走",c:"力量",t:["力量"],lv:2,d:"25–35 分",m:[["保加利亚分腿蹲","4×8/侧"],["农夫走 50m","4 组"]],rx:"哑铃各 20kg / 农夫各 24kg",sc:"哑铃各 12kg；走 30m"},
+{n:"雪橇推进 6×50m",c:"6 组间歇",t:["站点","力量"],lv:2,d:"20–28 分",m:[["推雪橇 50m","6 组"]],rx:"中等偏重，组间休 1–2 分",sc:"重量降 25%；组间休 2 分"},
+{n:"墙球 100 连",c:"计时",t:["站点","短狠"],lv:2,d:"6–12 分",m:[["墙球 9kg","100 次"]],rx:"男 9kg / 女 6kg，尽量少断",sc:"拆 5×20，每组休 30 秒"},
+{n:"双摇技术块",c:"技术",t:["体操"],lv:2,d:"15–20 分",m:[["双摇","5×50"],["单摇节奏","3×60 秒"]],rx:"组间休 60 秒",sc:"双摇改单摇 100；组间休 90 秒"},
+{n:"HSPU 容量",c:"EMOM 10 分钟",t:["EMOM","体操"],lv:3,d:"10 分",m:[["倒立俯卧撑","每分 5–8 次"]],rx:"剩余时间休息",sc:"改屈膝俯卧撑或肩推"},
+{n:"引体容量",c:"EMOM 10 分钟",t:["EMOM","体操"],lv:2,d:"10 分",m:[["引体向上","每分 6–10 次"]],rx:"剩余时间休息",sc:"弹力带辅助或改划船"},
+{n:"2k 划船计时",c:"计时",t:["耐力","站点"],lv:2,d:"7–10 分",m:[["2000m 划船","全力"]],rx:"全力，记分段时间",sc:"改 1500m"},
+{n:"1k 滑雪计时",c:"计时",t:["耐力","站点"],lv:2,d:"4–6 分",m:[["1000m 滑雪","全力"]],rx:"全力",sc:"改 700m"},
+{n:"6×400m 间歇",c:"6 组间歇",t:["耐力","短狠"],lv:2,d:"20–28 分",m:[["400m 快跑","6 组"]],rx:"比 5K 配速快 5–8 秒/km，休 90–120 秒",sc:"休 2 分；跑 300m"},
+{n:"5×1km 阈值",c:"5 组间歇",t:["耐力"],lv:2,d:"30–40 分",m:[["1km 跑","5 组"]],rx:"比赛配速，休 60 秒",sc:"休 90 秒；跑 800m"},
+{n:"5 公里计时",c:"计时",t:["耐力"],lv:1,d:"22–35 分",m:[["5km 跑","全力"]],rx:"全力，记录每公里",sc:"改 3km"},
+{n:"ALLTRA 力量三项",c:"3 轮计时",t:["举重","力量"],lv:3,d:"18–26 分",m:[["高翻 61kg","10"],["借力推 43kg","15"],["墙球 9kg","20"]],rx:"男 61/43kg；女 43/30kg",sc:"各降 20%；减到 2 轮"},
+{n:"ALLTRA 体操日",c:"5 轮计时",t:["体操","混氧"],lv:3,d:"20–30 分",m:[["双力臂","8"],["倒立俯卧撑","12"],["膝触肘","15"]],rx:"标准 Rx",sc:"双力臂改「引体+推上杠」；HSPU 改肩推"},
+{n:"ALLTRA 混合引擎",c:"4 轮计时",t:["混氧","耐力"],lv:2,d:"22–30 分",m:[["400m 跑","400m"],["火箭推 43kg","15"],["引体向上","10"]],rx:"男 43kg / 女 30kg",sc:"火箭推降 30kg；引体用弹力带"},
+{n:"ALLTRA 杠铃循环",c:"5 轮计时",t:["举重","力量"],lv:3,d:"18–26 分",m:[["蹲抓 43kg","6"],["过头蹲 43kg","8"],["硬拉 61kg","10"]],rx:"男 43/61kg，同一根杠",sc:"降 10kg；减到 3 轮"},
+{n:"ALLTRA 沙袋",c:"4 轮计时",t:["力量","混氧"],lv:2,d:"20–28 分",m:[["沙袋扛 100m","100m"],["跳箱 50cm","20"],["波比","15"]],rx:"沙袋男 40kg / 女 25kg",sc:"沙袋降 10kg；箱高降 10cm"},
+{n:"ALLTRA 决赛模拟",c:"计时",t:["短狠","体操"],lv:3,d:"10–16 分",m:[["火箭推 43kg","21-15-9"],["双力臂","21-15-9"],["1km 跑","收尾"]],rx:"男 43kg / 女 30kg",sc:"双力臂改引体；跑 600m"},
+{n:"ALLTRA 节奏 EMOM",c:"EMOM 24 分钟",t:["EMOM","混氧"],lv:2,d:"24 分",m:[["奇数分 12 卡风阻","每分"],["偶数分 8 跳箱","每分"]],rx:"箱高 50cm",sc:"风阻 8 卡；跳箱 6 次"},
+{n:"ALLTRA 抓举 ladder",c:"计时",t:["举重","短狠"],lv:3,d:"12–18 分",m:[["抓举 1-2-3-4-5-4-3-2-1","阶梯"],["每轮后波比","10"]],rx:"男 60kg / 女 40kg",sc:"降 15kg；波比改 6 次"}
+];
+
+
+
+/* 常见动作的退阶版本（新手模式才显示） */
+const EX_ALT = {
+ '背蹲':'高脚杯深蹲（抱一个哑铃在胸前）',
+ '前蹲':'高脚杯深蹲',
+ '过头蹲':'徒手过头蹲（拿根扫帚杆）',
+ '传统硬拉':'壶铃硬拉或哑铃硬拉',
+ '罗马尼亚硬拉':'哑铃罗马尼亚硬拉',
+ '相扑硬拉':'哑铃相扑硬拉',
+ '保加利亚分腿蹲':'扶墙分腿蹲，或原地弓步',
+ '箭步蹲':'徒手原地弓步',
+ '杠铃卧推':'俯卧撑，或哑铃卧推',
+ '斜板卧推':'上斜俯卧撑（手撑高一点）',
+ '站姿推举':'坐姿哑铃推举',
+ '借力推举':'坐姿哑铃推举',
+ '引体向上':'澳式引体（脚跟着地）或弹力带引体',
+ '双力臂':'跳上箱 + 俯卧撑',
+ '波比跳箱行进':'普通波比，不越箱',
+ '墙球':'徒手深蹲 + 双手上举',
+ '雪橇推':'原地推墙，或跑步机 12% 坡度快走',
+ '雪橇拉':'弹力带划船',
+ '滑雪机':'划船机，或快速起立坐下',
+ '农夫走':'拎两桶水走',
+ '沙袋搬运':'抱一袋米走',
+ '悬垂举腿':'仰卧举腿',
+ '平板支撑':'跪姿平板',
+ '划船机':'快走或慢跑'
+};
+
+
+/* ============ 周汇总与海报 ============ */
+const QR_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAADwBAMAAADMe/ShAAAAGFBMVEX////+///+//7+/v72/Puc3ckUrnUDo2O+ei8TAAAqUklEQVR42u1833ccx3XmV10DidojoKtmAPIoCYmeBklld0WhB00qJ8k6gfAjftmcJWTR7/bZv2f33T7rvC8pkXJkZ30EUpCoyNkjNNAA6ESOhEaDkEOKmJkqAJRJBdN196G65zdo5fhh95xVvxDFqqma7rl96373+24B317fXt9e317fXt9e317fXv/fXKz9x0x/F6393pM/Y85iYek0Bj4XxECILAYPEAdmvaczhFkHm0EcIA7Mocg4Gil4gAgIYRwkpIN46Jw9CzO82f91zc3s33J3NNDi5s2BO36rGFbK/y3P+AODvqPjmSnsx4f8Ku16dKO707sgjtMNvoTUo13PHIpWCfvxkXOV3jbeBWEc7Ou9cHDOv9Rx78Jny4P3cD7im1fEsbfJfHPkG979AETZa7zjMB8HvjnyzX2vwcWxl77mGwZR9hpcHOuzcnBOv/jBnPw/tsTg05ObADQA0JBnazsIBGFb9j8Yiha7N2TO8mbvwidfAkyAMQGgKno7ADCWW4mAEGC5zQgBIX7HW1Tq/gF09wgBAAEphw4cRco1r/aYNSk1vQUFUqRcQ0o74Opo3SMAirST31PPnN2PvnvhpHuQUwOQfZ4Gywt/eSdpfTTb2lpY7QyI782uaowmWF7IPny99dHsailYXqi+n7QybNybXR4PljkDaHDOwYV7zNbhNQDsvC/eLINX6TnPnBajO50X85VlgD/2Mb/sjC37bwjhiDfLKFXpbkavLF+ewdXdLQA9r8LI8IURJl0L+wDA4lAoiVTSoTRH0tzqDNgoNwEmkdV2DvwxJk0FdiSAzUo8j0cDc5bLJzzqOGv7uIjHc4XxEkCkKTfb9vNp5uZOGkkADW1bBMBopgfmpLXD+3ODCzMAYG7U9qCHhfE2GcAIjCAaAEJE7SfENhgA8GAUopGPBICKxwS+zCduz9l7lXruwp/K/3jbGqCZbjZVgnWXkjE6MK3pGF3TRCglONLIIiyaVqmpEqiEADQaThU6zVe4Vsx58sJ8azEfNLth/9gZF/VllIDPPsMiFBhfartb74Kog7TAyNXjr6BGROs6Sh4I4orY10JrDgDOQe436fX48KSFxZF1PGDG2wQAp+SLVkVv+YYHo2XPjRzm01+mKQA4X3xXwKdmMzjjZ3uey0VrXu/5hsErey4Xx2yrd87M2+x+bXq9YO5YChfJNDQ1IhBDpKERA5T7rMLwDCDAoAFNje2AGADRZYZa9M3ZtzAN88T5KgIMkB0n2e1Ouxyo6LhE0edZh1zP9tUkAIdPEUj4DDDTAIjzkIe1sBZYu+BcQeVOZyoGiZDpwVt4tlUPLtzaxqpGKUKjgb2AYmQRbgPWtgWiELeBkml90WiVsAywKGs0cNRolbA2+cypn70w9DJK33c/W8Zitbm6DHBWdherlFabjmi8BSxj5Ad0fRn4nH+PFspu6qFUbd74nBGg+O+xMKbkRhUsNGXp3gobKVgVu9I40r0vzZSIQmxJOgqzPe+giqSK3bIpS3d8crsiIvw+d4xt7hAoAwgUFU4y/+0SQsQ5ARGgmS76lKvqJ/2yg8bFTrrjWm7H7aiQdVvuVAAGhAEIQuR9EgCmQvxed8y2UVLEU0y4dlMgRaTIqKaj1HTMtzGhaDRyvN1gRyhFpKjpNgnYhrf7+yxMC1j9MQHsfWplAIz5sasZlai1IjSQLWD5x1RaaN2n1VWhmXswn92lloG4jN/rN3acKbgpIkyfrjXuZjaIiANUao0jZDF3fEEalaC5B4QghvszNFJr3KXxKby4u/VNFqYTg70vzQ4AmQdMZs3Ntj0JGRsCICkzJJlMgTVXQ7zGSEKCpe1tEf8mz8V6/HFPhEu64067bBx9w7Q+Mb4c9qjbk7C0GCweVcII0B7VKIvBZhB1uUFG1inWKONopE5cK8JKkd+xbu8GPD1x4czkERKtOA4AZEEi1Aq8NJ4Yy1bBAIrgJ1u/GWtlADKW4G7m8LHWKngGB9pJ6M5YK0OQCB1zAMiomPN95px8x9fbO3MeMgGla0hS7F/HYo6WEmT7+bjWdQDGXMeiMA4aa4cMCMCBuPNszfV2nPEMqw6LwIy346pdH/tBzIPRAi3tBzEPsjgfHwG2j4tjL33ON9wzPEOI7YNekNwHt7uDvaBjCGGx7UbcIQDIouBMx3qyqB12dfo0gIAA5doOhhPmHLjjnld+xIaijnefAUxowEaZDNBg1aYGHFcBkGT7BL50BBhBGgBlUifO2b8we7P7FSjnwVdaU+DrHACpZrAJBQ64CQcwpoIYXNk+7YCbva88Uq4B0ESwccKcg3fsDwIsGg+WBW4vtFYQ35tdRZYluEN4vNBaAUoLy8Do5dYHFN+bXb2M5YW/WElaH822MmA8uC2Ohs85uDAbANIs9MUbydaIT3ez4KIY3dl0fJg1vOaZD835GXE13fqq3Rdf8eEs83nPfGgu+8K6zME5+zzX9PDeWErDXSYlACYrG4xJaTxPSsmcVEqAOn3jsZRZ7ZKUkvG4esKC1LcwZUN2bvUqAI2ss/UjB0c9/1H8qWx+wEZ+WoNeGTJn49W+O94bTGrR5wRAoFJtb/0zNcEYAM0gawEEKjUwwLd9ecggizhhrzk4507/b9xoJAODPjSoNZt6BSMJEXTTHFu0FFcmEqrXWXVYn5gwZKjWbGrdeG8gqKYPqH/PcMwJybDSkkXslRmxPyLq43Qz42zp+CuxPyKUxM0letuIK3nf2walpf2VfP8oN09OsLWtmsKh6b+QHfg0Dx3hbNlzuYBP30lFgZYSn+Z8w/yxou8vNM743t0MIRpaNwcDr2jgdaLhoUrEHUJms2I6h+kdtAQCiFlg3unrLBB9k0CgSBAxASYgAAkmba4pTwF1wagu7NTGVZ10EySYgBTdfoMJMNH1VrfvmE9hW9vNhBhSD6kHwDg4BHFnquu7cwfKU+0nRSQ809sXwDhQMr/hEFmMSj4hEvXseLrrWsAyAGA8aI3Q6mVxAyi9flxCq4TVK+6tWSwDpdnWCH1+XtwASrOtlX9Dvpo7P6CfZACmQpH4lOb4qF4SSdlNq7bPZmhHfkDXtWPACFJBaCxWm47Yvwk/wcSS/VzTEYlPyW0AwUXxKN5jP8znfNv0Pmq3JAkAnN0FIWUHH3Ehq9iVBIAHDS6iEHs5Wmo6IgppIzTlDpKqyLxVgZT4LIgBSJHtOkxiV5qydNnAJkHdON9ioI7ldnb/qMKJEAENJggREAV2ZEKIRKX4nO4KONGJR5U7uDsxQpgdiYN2gkmaThKJEGZbQSMFQuwxIDT3veyobbamSEW1PyfQZGC8thmMClH35UZ7zv7QRykajfjZiCtSXfiI563RiGcRAB5hQtHZiGcN+xsD6YTbdFRjOkaECY+abtNR6lAoRRQhiJzT1NzGZUVKUdNtmgEyZD67O9sqwSJ7LwWA0myO8+ezu7OtL7xWmlobL822vvBaJdisamm2tQLnXIoF3J7P7nasujSLldnWCrCAVY3zXvZ+JzFT3DEvz9BIrXEkMi7GDnQaIvVGz4iMY/Q+NmdopNY4I453C7RUa5wRGceLaQwEpztIitVopNY4QsYB4P4MObXGEdgUuSn4DG1Ntp1ZGzsxBgZ5JBqAacQs02gEZ0QD4stss8RIQh6JRvk+JGUZbKtACxIyzgBAEmNkW0JLJZ6zLW83lI+y9DUGldGgyyQI6qT42wapAQGCBqCx1mP8A7CfesEf6xkMUHfU5XTcLmlGRb7KmQp5KPKWzbtRHgiAc64tEyFYJeRhxa4f1jwGu3kA0FBw8lYKCKcypRkxWe23aot6jr8y+yNCx8giIMKibTmm6IvgJLSdYjwfqVaACBNjrSxPqd5xLXYCADSnciTlJaK5gtIktaKBTcKY67iCElB5CwB3rtKuRweQpQIcofQe2DUosJFrtIESIEsoXcPKLO2Cz6zVzmP/OkaA4zZWYixvpSlK1/DedSwKStb6HIhTc0d8c99rhNjWo891sUlB7NTcsmfGJ1lZJD1MU+KTbd10tl4Tx/N6zzdtXAVX+lSazmIgZBs+QlDZMzf7PZeJgpcJ0FjrQty5AZkomCCophMWDpTQ5U6FdYQajfQ1Yp3dn3SRo8rDCUx0XKbTHeYzQIBVISt55kgAAk61wOhAkVLqbUmgBiHAZJ7pt1jFAwOk8H2/7HWnonoxq/Nk/6VTT75G/flP/QeHL3hP9KknX0N9jSfNT4E/ZKeeZDszL+AJe6pOPW33safq1NOHp56YtRmGp8negfdknRDseBrAPvOe7DSPz/3T5M7BjHiqP95/6dSTmHoXZrRw9gO3/gv3560/ixbO/UrWP3Drv3Dv/fr5n70ymeLBrltfnbt3QO/Kxp287yOp3pVqWdbfF/XVuXu7z//s8rlfyfoOUJ9bk08BZ5zVP11ofDH38fiffiTrdxbOfuDW3YeDgcDbDedcetkXzTJ2qvR2wzd56/MkFXrmvNjfif2ETcd83jOHoum0R4ZTeWv7Ns8QXBT7OzHAy0uWaW2WsVPFTpV2PfP+dq9xBXuStD+24beZJh1uO1O2ZQQOfMOkeafaLLvx1KiU5kgaXoz0s4J3ymaaKSCFuQVglElj+SppOSlzKE3aZ9U7JQISIHXaW38EkbIiaKUkgAbtAE1sB7rHqq1J263fpN258cL+9WAg0EmidmX5GQMDCwNGtsUrM7kDBQAnLPdbtWi3iilmQoRTQ+1/iMskAMZrNlWCHZdeiRDEttWIISIsmuPJFICJsJjQQc40rbuURc583jqMgRxJIcKFhHaNOeyMPDCUPTtd7KWYmM3Wd7wLYn8FpSV652or9zmML9GtpdbNjipgYrZ1E1jMsZO9FnNctdqTVRu5ut9P1ed6BuSSBh2i4pt3+BffFa15veWbOd9cpiwGUOa+mffNZTIOmmXEAcZ9c5mYb7FTDCAE83NcdSvMeB4WxIEY9yb/e7/L7GSQpIIzGQX5z6GpcV8QBLCedcejtrUjsigQwDpYqNvbb8TzFjFK3Pteek4fesjWXx0fzpgXiYAeukh8CeghWotBckc0uzoE8uhUKSSARgKYkzJ7FY8YshhODXrKYiAG7fDqJkF5qkZZqgFdJhBU9zf1FEwIDQLnYeoZB0wLgIjIYidesTKWLszVvXAjF7+MRQBQMq0IEFjVKK1ld022at8Go9awYlodbcYWM60M9e2chULD3vHyAlYIGRDloH80Qsm0zqYDVi2uVJuOeBTfd35IaZXeS/F9sX8TpTfcuEbXNb5vHSFzNYK4SxTCpvOWn+BKrcBObnLbwv/gomhw8c/pff4D+jF4sXDXHXsW9eQ4h/bCjEkTso0qpKSjcJTlVD0PzWaYdcl49sIsBqaECkl2sNP+vEKYxYAUpgIh9GuSeEcx1CPHsGipcG/JJDRS7eQONE+iwhdwAvCeLAOvrWMbgBjvwk6NuC8cpe4UQakjgTKswEAMYMT8DKIhqjnqCUdt39T20MRCkVTpYKcvATaTxYAQDYEvKw4YsTBL+5CEVBHGLQbadHdcUvRi5FxUjW1czrETu6YaNX2wvTiMmK1/CAA4XM+xkz4UGqAIQkORPhR6BRMe/VHE3H4919EslhlBaEj3fI6PVoRe6OCjj2Zbh9pc8IctTP+cxgAYn83eF7o02yrhzrk9NotIWQR2ex7LjLqyBcUdHzozFE9Ciyw+fPxd1+KjI7ApjO0i9SxaOl7fZd8dykSzib8FAEfO0KZnLoqMixfTPTlD7yN4WWRcSJ/snHez3m3RlYypJEqSGIBgmckkZEwxhDHbWZJJSAgnhn8CAy5nPQCjNcZ0RHkCabTKWCedlM+JYRkBhTyvTrnb3WA57zSZm+ell0/KpYwK9KRUdX+Lekk1Z8ADhzUPgAMNVIMAglXCSljJ0dLJ1/gGnHAqtkSUxVVTmhELhRZdrp/67/iAJXRupy0ruYvptbHsc0AKtQI0MDHWemz2p5+ZQTIRSgkZxBM5riol9Ec5AlsH3c1m7szWL/Xvxyy/+5kp7F9HsLtD17Eojm/l+OjGdSxC7LrPZECX8Nl1CO18lvI3ULqGW8DEFboB/gY8sDGFAJX+JKrgPt0E4GxeEcfzOgJ4mJW9/ZDt+jjwyXJLgp6VMmM+mvNqDYaHzEfi0+u+4Z45L1AWiY9pbcqeOXxWuqkRWzYJ2llzul1m/OxnXaRbtzkLO3HlTleQQMOMC3naUwBgUjDZHx+K35kmZPaj9h1qfy7IW073ZtiJMhWJhgPjKwLgKD4dV0k1pzdDBVIkGlVSjelugR8TQ2KXFNOxg+yyAhV6vkvRZQUo8LUp5Rq32Yudyl/J+mdzZ1Pop/Tzh6CFs6tzI79w//7xn34k1W1Z/2xu5Bfux1qM56/rzo5SX7NTnUWfrBsj1ftPUZ87m+K3L6h3pbot6x+49dU5i7LuLIx+4NYfPO3L+pR8es4zH44dtpaDmDs+PecZvXzZF28kW6W81bnd5AYALPb4Me74oG1x2jN3zXkfb5bBcq3f97a3rvhgVdpbbgcQbSQhpWRSMm0OqjGEbW35sZTGmWRSMCm3Oss0b4Qz/lT4nurzmzITkFLCie1s0k4kdj37H6k/OqhuKmCQ2mlLTJECGqaASG2po7kRYi3ZRvh2b8LJclJt3ol6sBOBqEuB2aFxrS7PS2ETpQRGcpJBfAldsn2d3dcm7CM2vVMbTH5LA2ICTfshRhD1IrgYEt5qJ6FmQkFUeE1qJlSv82pTp6CEmgm1w2K6b0pLb2fO9+qbv+pa2LAERzEmDGWoJbAKvl1jDs3x9BElUBad9S3sHgKffJL/3xJuAp98gkWxrwW0Q8D+J11PdCVg/l/vbfrHk9CiS4N1HQDeX8qAqCxa13Hes5/jmWdAn3wCPxmMucq+yWNAznya801petRq74JNxzc3w46iXIk8ROUmvtBl12wGEYIzvuFgvmjNa+6bW2F2JLJ4j/s0r7vpoPbuVOlKFFnU0yHg0Z1EArKzcSm5Jf4wady71mNbURf40dRILxKjzpxZd0jciUA6pBF6nOQQJZ6ycojd6yM/hFEDCmUAbh52sC7eifVS16Ve/sg+Tu0SEXwDbeW/mwUGijtPNdKVw2rzBkpLZdERE0fIMZcG4OzMdj5HcDQq3kBAr/halmOnzGzjNmVZhL3AZuhLaxYD9TxVdu7Co5+GoOt/VesEAkBcYK61McXbn8vMGu500FnXwg7zqVRtvkUA2DImfCpVm45ocLHg02fLFgPtW/Z3/B0AKN8L/6aWxWF4J1eaO84PKbntXag2vy8ab8FL0co/9yiNaTlHZ/1JVLck6b50nQyACbHXxTtJsNCsA0yaW9MAIP1tAGcvJpfWCBGC3IswJvFZAIudQkQFkpAiewcIaQ1eWbo3BzwXdcLAqMJ7EqU2B9EB4anQYCX3LXbtkT597m9YIa63n1cuNNZN28x1F7E6LIlaiPGmQoReX6IIcDrpJjh/7QHOxnGAqhBS4JXOFIxL+zYU98DDHh3/YBL1X7/+4yfq1IN/IqgHzr88+Nc/fqpOPWBofo0HX9PBPz11d9L/iPopjAsA7BcEh3kHL6GpnafP4UUBPFln+PdPGr9M/+DUA4b6qTxl6e586bdbp/7dqQfPPex91Fn2I5SoZYAFrF7G8o+62NTmbeDxQut/tqU75e9o4F9MFq8CgPDyKfAjlBbwXg9+fbzQenu2EP3vfUEtjcF0U6XWuGv4VI5z4sA4yDgOp9xWLC5abil/pOfX4yAAEG7rytm4a4r7oVn3jNMeeel0rXHGm4zidmtvIN207UnkiW6wLMu146x8KAgeJGQ81vFS0ezKc/+ZIQIajbbDy9bc18B0oro2QAl5BGx0WulAeKu7/qCumM7pzUNZAdlidYL9a07XdVbJA9p+6aE2v0MeqTzUiEE08wdn1oGQHQCcQwNVt+0yv/KFRGPLflenJNq7U1wzyHN5iY84EABB1KfjE7ETgHjEba0CUtRBd0eRRfBSi6RuAxNjrc8724QPADLN8w8b820/WkqoS2QWRJiYPf7K7Bcr/Gb2eFQPTaJatLSEJMKioGindh77Kxi5SjeARZEleNnrDP71XhYDCF72ADT+B/gSPkmxKOhAHI9ASazM0oEwh+J4d/2Zj9rio1ylB6fDJm0V2OlmD4S5oO+GAByv7e7RnKKy181Jbfrmvlf/2/YKWTxkYau9s2gJEAWqbmyWCuzUKx91LmAFwF/1YCdM9FD8QrnQxvRnavuEZAIQDYhD1s4cHUB8CVFiBAmIRp95li9MAPTTWleU2UPVF61HAKTYkd01SN0Lu6pKqjEdX1bgqVCuuRRfVgQcOIpEQ5Bq9sviy2WA/kvX+8bX+em8+qmrFkpNx1ypcrNbmNn99/H8Vx+4Hz/+s49k/c7Tg123vjr3j+nzP39IRtY/XTAfuH//tMBOg4K7J+vGFNzSL9x3d59/V9Zv5wzV3z0ELUx+unDWUcMWngqrL7U+fmXmJe83/yCesnNrlT9/6XT2ce0hKr/aW6i+5L90hjB+ElZ9sg6+vTf+Z+VyVfovednHV/5DRWxvXfq48ucvnTu1X5qrlP3yyjB8jFEp5VY5ljIr1zRo18+YLG/W1gHjX5JSMlneeCY8ziqXajlakptTsZRZ+dKGn0lZ3gCktOq+oTLnYutvrgOgBNCgdQAq6c/GD78aae4yC3WfiSnJFc8WO52wcCeK5WHIw/4cwO/MCKAjsqpJWwNj+Sqr52NgYTDMZbbVdimzVP2EOc69bDxh6MC0pn/Hskfvu7Rr6MCYXMGHSxEWcz2fSqgVDSND+MrVjLAWAXD4Er1zNesqjXrPvugnl5lkwbrFqZ98gkU0rmH/OgD+m2vZ28A17F9HycPI1Va6PrDwpTO+FSg3Uslzpqkdf1c8cyjMzsm/syIAotTBXK15vUaXXvbMZaAsWvO64ps5P/vpEAciqKPd6+KWuomSrV8FJ2SaDjUAExCjKHhZA5qKDP06WKipkVYIgtgzjKuTORoy//QJt6w+0L32OcQu2bB0EwCoSRUg48hiKCKC1d5Zxij37qaeVCGhRQGMiYEYtPnsUgyArwe5mh/aqYTbus1e8QrXdALvlKMeAGjyNay0W92byv10YdgNt2z+u8HWWhnie4UqClssR1LLQGnMfNjhq7qfqNDOm6LBxT/ruKe1Vej5AKDSGLYwt0lZXl6in2Tea23NXljuKPg+ibFYbe5Eg4/6KMyYNFwIgM2YzaKl3cey43MaFW+Yz7KGNFqTBAgpCs1e1qXgk+HYEOyEIm1qfyGyYjzb0iUaQgQ+Qz+tu0LVjoKPMnV6yCbBwlrbHvkMgEqYt6yUGQDkVCgAFoYC4KEHIAxZGPAw4KE3FQr0FD63cwB5y+FimFXn9VtKO3R4BwDORuyiUpwO72BE2W96qCAsm9TWLEJECCKeRYwAHK17RNCK9KFQingcFiyUUmQiLLrNfpkz40ud+uNF92bG+NL+vdcbd8AW3K6OZejSEi1rXAj2V4BF99YS3VraHxH7I+6ydpyl+vtwyq/vj9gPVQ6W9u+9bnXPpaXuCueujID1lwCcGfoLhdO+e8YbDeHMFIkiZ8YXrXTP8c0Rgpe9sYNNZ4Ze982c7x55LhetdI/73ofZqy97LhdvHOgIZ0PfPeO9eMgAcN9UPLOj+zMCYAAiOOf2nDlGOepx1hxnrp0oisMu5YZmsVPsgzIvnclCsMJPmUZcYCdnY/TQpdfAdOTpIZq9QW3/gH/UfSPpRKYJHZmzBpjIR4p+q9YF9so1MRoaBEEBAPBKQdoKVvHykYJm2iq9QsE3FbeZJkCDhxWAIEwwQ1NTmpEtC+pNlDeTQhuSmYTuZqw0dvyVaVBmErqdO+qxJGeTCLpp9iOwhO64dLuj4Csl1MqZpjQGCuwUARFKkzRU5nyVblpAxcIqthMNYFFka7t8Cbeu0s0MgB9CSXxSQNxrUBKfxTlauoXSEt7TWBR0A+xN7Kd7zlW6AZ6BvwEl8Z7OBa4DvFP+kzob89j3bIXT/q7DfLzuWwn0/UWR+GhONdeBimcVfI35HC116fLGJ5mPY1HZ801pOtvLR4aa1ODrRH0mkyMpp0/mqUHI0hRAQ1kFnynQ0prT1uUpxUIA28/ZJKq2vFOWbU5iOO/kC8cXVl/neO0o0+ahfNFWPhXwED1usTdRKgTKUx4DfFFu805eFwvcThs7itzEOZcAzfMKfA1BNEOqMb1l+aPRxIGZUUQKTuIAKFocyPHRFhScVCjXkLmswO/wckBuwiajywpKga/xsztsAMJksv7Z3Nl7c83/5K9KdWfh3OrcyC/cX+onRtZvy/rnc2dT/PaA3pWN9xesluO5Xz//rqzfefjlrlv/hfv3UEbW33+qd936Dp5j6mcL1Xuy/tncuXtzH+0+vyzVnYWz9+bOoS8jUDn8QVtfZ5V4u55ZjQHwDOUmn/fM32QAprbtZg+wcAb1tVToqSnPHIrGdswz2Nad5PJMZ5ZD0djemqnlrTtJH/0jC6aI2X8lk3JLAsjK1aZ/SUoJoCwbZS/HQCxm0siqxqj96Aayct7a5X2806blnYSUcveEJGobyxMIkDIBmk0keVDbBMB4t43vdPvSZrOdKG2r9AjQoNShPhV0j1X3q02lHOvm0cIAQOiBESwGEuj4UgAIQ2vV1VpQzKJZz7sxhE1lCTUTOjDHI/mZD82E6vVuXGVbEUZsSsm82mzqFQCbE5ZbsrnAeMLQ52DV9izm0BxPb1ne6cDkeoBuAcqSTSntr4C9mUvtFkUjsU7O4VePvxLN7bS0hOvAxKx5K2eo3u6gjXZrMRf63QBGrNZvaneJVlNcCI7TPo2A4xTnQRyxXZ/UlE690bI3mn+/V22FU3OP+TSvMW6jBnbg0182Yx5kHFnMmU/f0TEPxopZ5rUY96zWj/mkKmLcy/6232UKYuikm7I0FVFwRiNt4yoGjdgBIWvkqe+IOwTTFe8XrvaiRgyHkGWNcT1mEZhtDWIn3c0tMYZKcBQCosf2ugyvzSYV5U22Mgo9lVGFUpoNM642f2z1ddDZNKCJgwsw6CxoZ5IUtJkRHoiXuYIKZBs3VmRtRgY1EQCcVQBoTdPCA3GHK6igGgAoWgMu8+vnf2P0w1+7+oEy8sHtp031dOfXbvNTy6w/3H2+/mtq/AP95oUHt582f/18/R+QgswLDz54gCfYeYj0IW2/8OD209+eevrwy+d7R+6RMi88uP002X2+rp4Oq3cKLor6zrpjbN2SObQqPYur+NmUf69dC2UORT3ZYj+kpLE3U7WiZ9v3kwxA6Y3uqqlH6Va73mm7PyMgJQFg0sSWd6L7PQfqHIXQ4YFs10KZI2luOkziM5wtS3OU46OiMmq3altWwZe906l36sdObjs+3AGisONA86KZLAIcp1fY7AziI5tSyuLOyRFdI4e6zJ4TIBC3TXJmKneEPRJo+2dQG8BH7UyC6B5pzDNcpqMI0KQa0zEAldc7NSP4bVRuaorUjkudvtKO6+zShK1wcpUiZVGWCXfc9skRjtLTW7Tj2nqnQoDChipqOw9k3l290MZOQoPNi1tXG3eX9u+9vj/ifj7h3sxQWtq/Vzu2aCmfxbtAy8W047VjHWPRvcGotLQf66Ey54IjrniWd2K+YD7N5qJoHeIwpNenqiP+5BnP5YL5NNvAaX/yjNfg4o0DnZOIvOQLNwWA1Bs77e3HU/dnaF6j4rt3B3inxAOglLJfs6lMopjDenSfYq18mO+f7SeVoc1WmeY6cvljCmRZzFwtt72LYOuOA5ZhqGaP+Qi7Wcdyrt/TPXFvoUtFd6Vqd6udhNcASEN1Aa5sKBky5GynYCNXTfNKGAcZR8bZQa5FobzCj/Lvltd78QCppePz1raG9urB4X1GfCjvxB5fkyjObsvjnLdd7SUiArUP1EEfWlpeoLsZJvLWikYWAQ17xsSHBlmEIOZNs79TpoRWMv6rq/uFZq8dZYa1YerS0EfjDi4EdCDoQGQcStqT9ehA2MLXZFsLzQj8jfycvQNBNzA1g3295Vylm1kwIY7TwwSYSkeviPaRU+1z9oaciTe+xzcui+N5vfWG5Y8afKDeCfteXJkyDoMPe87efc9w7L6JYz36nE8AfPHonUmEaIxNlj3jZD0Ls60/GaIujYm1eafeWhDqNi6KqnTfCduyUrcN6alIMKaIAEwOjTJPuAQcD4yJE+udeM1SjW3JiQS8omUlsE7OeQ5LNzEMO2fv3LgivuZMtc/SI4ukSLVbPHK8hI9SsCNsusnyVTsCOCore+peczoG4K7x+QHNHnNmTlHyQHWug5dAv3R/+4L62UK1zvoqnGxr9/l3Zf39hbNbc2c/xWmmfv4QX+UqvXtS/d1DNsHqpJ9uuB+LhwC+Xjg7TLOH3jPxuFMDoK32jpb5vGdOC1HGm2XML1fmPKOXZX3ZX+ZWz3cfj1/D1XSr7NPWsv+GEGW8mMZ7KT8L76JwEwDc97s1eyecs1c9KAPAoa13ympkK5xYp7VVW5dOEu48luZQml0wiUcYrUnSckwKI/EIMHLSClBiAKNVSWmHXjzhnL31au85e0Oseh0KiMogQI9127GaRHEEj1L91U96eElKW33FUqeIaZttbjUvg+YV0p6VLW1PYYuR9gwm70N8WeF57s1rCHxZCeMAce1FiH1htx7TlTjrPe6OLeVfII+MMlvvtNl0Row5zHHVdoorCU2a3ShX962NUZZ4zaZeQcklwkHTHB9ArwARxCoWzb6nLCdFw2lcgBVn4s3qTXvHWhiQhkk9vAcsCgOUrtE7XkapdwVK4iagkdVSoUXpGm4CDOl56BFRuoabS/TBteOvrJ4iy66fRNV3n4mXcyqP/fYJEOa8gC/g04Fv5nzzU+eL7+Y1TXO++Ske/0neAqbLnXMkjvxszxs7SgHwoPuEndIANdi9ebHCSiCAHeqUiPYYngBAafvkCPSUj4LZ8/l6KBUMHPA3mOgXwwrtOvioS5fX6RO9fSL3hFKctPAgwxAA0MQZV1C2BSICQQU6sPdMUFCBa0faPJ3WulOIoKDVJfBahbsVnPio+xdubWN5IT9LL0N9O69iWjGtCKt5TVN217QilggsL+A2ZRk27s22tG21PjKte0ErRrYGpM8wrv4tmZfFXH6WHgfGy2LBp9YyxDL/vmi8hfIyRnwqVc1p0XgLU8uY8OkDM31RNB2x4NNCldJlni0D3GKnn2Tf8I7ZxmUxNq/uSToKs9iJw1zBtxFmzJ4OQfekybGTF4U0LonlFU6yqJraCrY1WIGrvuHCXQKUth1TI7WcVEKInFJR4dRsIBLjxdbfRlJR/tECV33D35jZswIYIcz2vIO2AwUgGjOIuiqcYM+KsFZdCFAsOGikRTYrHCq5GcbaKtJgpGg0AhpcGaWI2zhZNSMAbFJR020euqo4KwI4VKQOhdpxLZJqNACy2Gk0+qZ3HFkZW5I9vrY/IvZVs9DRxzGwKN7T2fGPUHLr98hoYNG98SMAaZJr/axuelHsrxjTNOtu9viapaDwu89SDNFIHRaakZxbGj3URSUp88VsGu+FqEx5Z7x6wguGyoTIODsIiTQiBGVv7GDTCWmuZkZ89272zRaOAJhSh1tqE/CRY+PKLAokWLGRWoYqAsCdoiVAcV6b0YWdnCFkaM85e+jIO3W/U9UnE1I9NS6sXQ1wklUXCIac7hUOS4wKfPSoEsYBImBKsOJ0DNsXbOYHhOcoa5cR5/aIvrrts7MMW7gRtM/Z6zkTzyR0Z6z12OyPiPc1EEFobANSrGgAW78aO/7K7JPlq9qbEMv5qngi77vj0u2x/VfXh91xHA+TW7XPfHC+h8sSqYc7sOeQB/eTrh2ergMQV0SOq8CueHQz8wBxwBlYDXgd4xvDrbp9zl5fYEI8aPNHBz7p9jnkuRJvz8tie+qeZ1moCuxIQPji0Qfi0MeBb+4Pq3c6+Uw8cWRdpioCAeo1tRybdkmZu+roAQ0cYiBD/7vP2UugSowAON5h14nNFoo7VZtXdqrbAMqT60CfZs+HEI+Et9k+E3pw4aFn4pnESxkpAvBqfFnl2Kkg9flanoB7NWYE3mwKfWRR1qFQCqRoei1UdHg2uqLIKvim13qxE5s5hfIfdF0SoF8SFvw1kJH1HbD6XOl/P/8uO7oj6zt4+Kl498vnf7bg/yMA8P05deopLfj/CLWb46rl3dJtWf9kbuR/iZ+94n8kG1bB9/WDnuiOOf91UCZm/puZmsOjNOaZPQGiWUY92WQZz4AgttzS52vaFjdvbzk/wHYkLubsVWN7y54VsRpfnoGS2L49NeWZn5hezzVctMRSJgFkchR5nZthY7a1UbbckvFsClZuAFJmXs40SZmxUSallHKrEksJKbPaqJSy79AoytRgYq+ROXnOSdmNEKSKFBJIO6qjfFbUNYxI5VpnRcolaKZy8TMpg/9nLu8b/de317fXt9e317fX/4Xr/wArES8RGEUV0AAAAABJRU5ErkJggg==';
+const QR_IMG = new Image();
+QR_IMG.src = QR_DATA;
+function weekRangeOf(d){
+  const day = (d.getDay() + 6) % 7;
+  const s = addDays(d, -day);
+  return {s, e: addDays(s, 6)};
+}
+function runKmFromRx(rx){
+  const m = /(\d+)\s*分钟\s*@\s*(\d+):(\d+)\/km/.exec(rx || '');
+  if(m) return (+m[1]) / ((+m[2]) + (+m[3]) / 60);
+  const km = /(\d+(\.\d+)?)\s*公里/.exec(rx || '');
+  if(km) return +km[1];
+  const mm = /(\d+)\s*米/.exec(rx || '');
+  if(mm) return (+mm[1]) / 1000;
+  return 0;
+}
+function weekStats(){
+  const today = todayMid();
+  const {s, e} = weekRangeOf(today);
+  const map = dayMap();
+  const st = {sessions:0, sets:0, reps:0, ton:0, km:0, wods:0, items:0, days:0, list:[]};
+  for(let d = new Date(s); d.getTime() <= e.getTime(); d = addDays(d, 1)){
+    const key = fmtYMD(d);
+    const r = map[key];
+    if(!r) continue;
+    if(r.plan || r.wod) st.days += 1;
+    if(r.plan){
+      r.plan.forEach(p=>{
+        st.list.push(p.t);
+        st.sessions += 1;
+        /* 整天勾完成（L=true 或 L.done=1）视为所有项都做了；老记录只有整天标记，靠这条兼容 */
+        const allDay = p.L === true || !!(p.L && p.L.done);
+        (p.items || []).forEach((it, k)=>{
+          const il = p.L && p.L.items && p.L.items[k];
+          if(!((il && il.done) || allDay)) return;
+          st.items += 1;
+          const ps = planSets(it.rx);
+          const wgt = (il && il.w) || planWeight(it.rx);
+          st.sets += ps.sets;
+          st.reps += ps.sets * ps.count;
+          st.ton += ps.sets * ps.count * wgt;
+          st.km += runKmFromRx(it.rx);
+        });
+      });
+    }
+    if(r.wod){ st.wods += r.wod.length; r.wod.forEach(w=> st.list.push(w.n + ' ' + fmtSec(w.s))); }
+  }
+  return {st, s, e};
+}
+function equivTx(ton){
+  if(ton <= 0) return '';
+  const cars = Math.round(ton / 1.3);
+  if(cars >= 3) return '≈ ' + cars + ' 辆小汽车';
+  const elephants = (ton / 4.5).toFixed(1);
+  if(ton >= 4.5) return '≈ ' + elephants + ' 头大象';
+  return '≈ ' + Math.round(ton * 1000) + ' 公斤';
+}
+function buildPoster(){
+  const {st, s, e} = weekStats();
+  const W = 750, H = 1334;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const c = cv.getContext('2d');
+  const FF = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif';
+
+  c.fillStyle = '#0B0D10'; c.fillRect(0, 0, W, H);
+  const g = c.createLinearGradient(0, 0, 0, 560);
+  g.addColorStop(0, 'rgba(255,138,31,0.12)');
+  g.addColorStop(1, 'rgba(255,138,31,0)');
+  c.fillStyle = g; c.fillRect(0, 0, W, 560);
+
+  /* 品牌 */
+  c.fillStyle = '#FF8A1F'; c.font = '700 26px ' + FF; c.fillText('HYBRID', 70, 92);
+  c.fillStyle = '#6B7280'; c.font = '400 22px ' + FF; c.fillText('PLAN', 176, 92);
+  c.fillStyle = '#6B7280'; c.font = '400 19px ' + FF;
+  c.fillText(fmtMD(s) + ' — ' + fmtMD(e), 70, 130);
+
+  /* 主数字 */
+  const ton = st.ton / 1000;
+  const tonTx = ton >= 100 ? ton.toFixed(0) : ton.toFixed(1);
+  c.fillStyle = '#8B929C'; c.font = '400 21px ' + FF; c.fillText('本周总吨位', 70, 244);
+  c.fillStyle = '#FFFFFF'; c.font = '700 116px ' + FF;
+  c.fillText(tonTx, 68, 362);
+  const nw = c.measureText(tonTx).width;
+  c.fillStyle = '#FF8A1F'; c.font = '600 38px ' + FF; c.fillText('吨', 68 + nw + 14, 362);
+  c.fillStyle = '#5E656F'; c.font = '400 23px ' + FF; c.fillText(equivTx(ton), 70, 402);
+
+  c.strokeStyle = 'rgba(255,255,255,0.08)'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(70, 458); c.lineTo(680, 458); c.stroke();
+
+  /* 第一排：训练日 / 总组数 / 总次数 */
+  const r1 = [['训练天数', st.days], ['总组数', st.sets], ['总次数', st.reps]];
+  r1.forEach((it, i)=>{
+    const x = 70 + i * 205;
+    c.fillStyle = '#6B7280'; c.font = '400 19px ' + FF; c.fillText(it[0], x, 522);
+    c.fillStyle = '#E6E9ED'; c.font = '700 54px ' + FF; c.fillText(it[1].toLocaleString(), x, 586);
+  });
+
+  /* 第二排 */
+  const r2 = [
+    ['跑步', st.km > 0 ? st.km.toFixed(1) + ' km' : '—'],
+    ['WOD', st.wods + ' 条'],
+    ['完成动作', st.items + ' 项']
+  ];
+  r2.forEach((it, i)=>{
+    const x = 70 + i * 205;
+    c.fillStyle = '#6B7280'; c.font = '400 19px ' + FF; c.fillText(it[0], x, 668);
+    c.fillStyle = '#FFB35C'; c.font = '600 32px ' + FF; c.fillText(it[1], x, 714);
+  });
+
+  c.strokeStyle = 'rgba(255,255,255,0.08)';
+  c.beginPath(); c.moveTo(70, 772); c.lineTo(680, 772); c.stroke();
+
+  /* 本周练了什么 */
+  c.fillStyle = '#6B7280'; c.font = '400 18px ' + FF; c.fillText('本周练了什么', 70, 822);
+  const list = (st.list || []).slice(0, 4);
+  if(!list.length){
+    c.fillStyle = '#4E555F'; c.font = '400 22px ' + FF; c.fillText('这周还没记录', 70, 868);
+  }
+  list.forEach((t, i)=>{
+    const y = 862 + i * 44;
+    c.fillStyle = '#FF8A1F'; c.beginPath(); c.arc(76, y - 8, 3.5, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#C9CED6'; c.font = '400 21px ' + FF; c.fillText(t, 94, y);
+  });
+
+  /* 一句话 */
+  let line = '动起来就算数';
+  if(ton >= 50) line = '这周的铁，够铺一条街了';
+  else if(ton >= 20) line = '稳定输出，比猛干一周强';
+  else if(st.days >= 3) line = '练得不多，但一次没落下';
+  c.fillStyle = '#EDEFF2'; c.font = '400 30px ' + FF; c.fillText(line, 70, 1052);
+
+  /* 二维码 */
+  if(QR_IMG.complete && QR_IMG.naturalWidth > 0){
+    c.drawImage(QR_IMG, 70, 1096, 146, 146);
+  } else {
+    c.strokeStyle = 'rgba(255,255,255,0.12)';
+    c.strokeRect(70, 1096, 146, 146);
+  }
+  c.fillStyle = '#8B929C'; c.font = '400 19px ' + FF; c.fillText('扫码加我 · 一起练', 240, 1150);
+  c.fillStyle = '#5E656F'; c.font = '400 17px ' + FF; c.fillText('Hybrid Plan · 备赛与记录', 240, 1184);
+
+  c.fillStyle = '#3A404A'; c.font = '400 16px ' + FF;
+  c.fillText('生成于 ' + fmtYMD(new Date()), 70, 1300);
+
+  return cv.toDataURL('image/png');
+}
+function openPoster(){
+  if(!(QR_IMG.complete && QR_IMG.naturalWidth > 0)){
+    QR_IMG.onload = ()=> openPoster();
+    return;
+  }
+  const url = buildPoster();
+  document.getElementById('daySheetIn').innerHTML =
+    `<div class="st">本周小结</div><div class="sd">长按图片保存，或点下面按钮</div>
+     <img src="${url}" style="width:100%;border-radius:12px;display:block">
+     <button class="close" id="savePoster" style="margin-top:14px">保存到相册</button>
+     <button class="close" id="sheetClose" style="margin-top:8px">关闭</button>`;
+  document.getElementById('daySheet').classList.add('on');
+  document.getElementById('savePoster').onclick = ()=>{
+    if(window.AndroidBridge && window.AndroidBridge.saveImage){
+      window.AndroidBridge.saveImage(url, 'hybrid-week.png');
+      toast('已保存到相册');
+    } else {
+      const a = document.createElement('a');
+      a.href = url; a.download = 'hybrid-week.png'; a.click();
+    }
+  };
+}
+
+/* ============ 随便练：WOD 放大详情 ============ */
+let curWod = null;
+const WFONT = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif';
+
+let wsplit = null, wsplitIv = null, splitArm = null;
+
+function wsplitReset(w){
+  if(!w) { wsplit = null; return; }
+  wsplit = {name: w.n, active: -1, t0: 0, secs: w.m.map(()=>0)};
+  if(wsplitIv){ clearInterval(wsplitIv); wsplitIv = null; }
+}
+function wsplitTotal(){
+  if(!wsplit) return 0;
+  let t = wsplit.secs.reduce((a,b)=>a+b,0);
+  if(wsplit.active >= 0) t += (Date.now() - wsplit.t0) / 1000;
+  return Math.floor(t);
+}
+function wsplitFreeze(){
+  if(wsplit && wsplit.active >= 0){
+    wsplit.secs[wsplit.active] += (Date.now() - wsplit.t0) / 1000;
+    wsplit.active = -1;
+  }
+}
+function wsplitPaint(){
+  if(!wsplit) return;
+  const rows = document.querySelectorAll('#wodSheetIn .wrow');
+  rows.forEach((row, i)=>{
+    let v = wsplit.secs[i] || 0;
+    if(wsplit.active === i) v += (Date.now() - wsplit.t0) / 1000;
+    const tEl = row.querySelector('.wt');
+    if(tEl) tEl.textContent = fmtSec(Math.floor(v));
+    row.classList.toggle('on', wsplit.active === i);
+    const b = row.querySelector('.wgo');
+    if(b) b.textContent = wsplit.active === i ? 'Ⅱ' : '▶';
+  });
+  const big = document.getElementById('wsumBig');
+  if(big){
+    big.textContent = fmtSec(wsplitTotal());
+    big.classList.toggle('live', wsplit.active >= 0);
+  }
+  const sub = document.getElementById('wsumSub');
+  if(sub && curWod){
+    const done = wsplit.secs.filter(v=>v >= 1).length;
+    let parts = ['已完成 ' + done + '/' + wsplit.secs.length + ' 项'];
+    let slow = -1, max = 0;
+    wsplit.secs.forEach((v,i)=>{ if(v > max){ max = v; slow = i; } });
+    if(slow >= 0 && max >= 1) parts.push('最慢：' + curWod.m[slow][0] + ' ' + fmtSec(Math.floor(max)));
+    if(wsplit.active >= 0) parts.push('正在计时：' + curWod.m[wsplit.active][0]);
+    else if(done === 0) parts = ['点每项右侧 ▶ 开始计时，做完再点一次停表'];
+    sub.textContent = parts.join(' · ');
+  }
+}
+function wsplitKick(){
+  if(wsplitIv) clearInterval(wsplitIv);
+  wsplitIv = setInterval(()=>{
+    if(!wsplit || wsplit.active < 0){ clearInterval(wsplitIv); wsplitIv = null; return; }
+    wsplitPaint();
+  }, 400);
+}
+function wsplitSave(){
+  if(!curWod || !wsplit) return;
+  wsplitFreeze();
+  if(wsplitIv){ clearInterval(wsplitIv); wsplitIv = null; }
+  const total = wsplitTotal();
+  if(total < 5){ wsplitPaint(); toast('先点 ▶ 开始计时，做完再点一次停表'); return; }
+  const splits = wsplit.secs.map((v,i)=>[curWod.m[i][0], Math.round(v)]);
+  S.wods = S.wods || {};
+  S.wods[curWod.n] = S.wods[curWod.n] || [];
+  S.wods[curWod.n].push({d: fmtYMD(new Date()), s: total, m: curWod.m, splits: splits});
+  save();
+  renderWod();
+  wsplitPaint();
+  const best = wodBest(curWod.n), cnt = wodRec(curWod.n).length;
+  const el = document.getElementById('wbestRow');
+  if(el){ el.style.display=''; el.innerHTML = '个人最好 ' + fmtSec(best) + ' · 练过 ' + cnt + ' 次'; }
+  if(navigator.vibrate) try{ navigator.vibrate([20,40,20]); }catch(_){}
+  toast('记下了 ' + fmtSec(total) + '，个人最好 ' + fmtSec(best));
+}
+
+function openWodSheet(name){
+  const w = WODS.find(x=>x.n===name);
+  if(!w) return;
+  curWod = w;
+  const lvTx = w.lv===1?'入门':w.lv===2?'进阶':'硬核';
+  const best = wodBest(w.n), cnt = wodRec(w.n).length;
+  document.getElementById('wodSheetIn').innerHTML =
+    `<div class="whead">
+       <div style="min-width:0"><div class="wname">${w.n}</div><div class="wmeta">${w.c} · 约 ${w.d}</div></div>
+       <button class="wclose" id="wodClose">×</button>
+     </div>
+     <div class="wbadges"><span class="hi">${lvTx}</span>${w.t.map(t=>`<span>${t}</span>`).join('')}</div>
+     <div class="wlist">${w.m.map((x,i)=>
+        `<div class="wrow" data-i="${i}"><span class="wnum">${i+1}</span><span class="wex">${x[0]}</span><span class="wcol"><span class="wrep">${x[1]}</span><span class="wt">0:00</span></span><button class="wgo" data-i="${i}" aria-label="开始计时">▶</button></div>`
+      ).join('')}</div>
+     <div class="wsec"><h4>Rx 标准</h4><p>${w.rx}</p></div>
+     <div class="wsec"><h4>做不动就这么改</h4><p class="alt2">${w.sc}</p></div>
+     ${best!==null?`<div class="wbest" id="wbestRow">个人最好 ${fmtSec(best)} · 练过 ${cnt} 次</div>`:`<div class="wbest" id="wbestRow" style="display:none"></div>`}
+     <div class="wsum">
+       <div class="lbl">总完成时间</div>
+       <div class="big" id="wsumBig">0:00</div>
+       <div class="sub" id="wsumSub">点每项右侧 ▶ 开始计时，做完再点一次停表</div>
+       <div class="acts">
+         <button id="wodSaveSplit">存成绩</button>
+         <button class="ghost" id="wodResetSplit">清空</button>
+       </div>
+     </div>`;
+  document.getElementById('wodSheet').classList.add('on');
+  document.getElementById('wodSheetIn').scrollTop = 0;
+  document.getElementById('wodClose').onclick = closeWod;
+  if(!wsplit || wsplit.name !== w.n) wsplitReset(w);
+  wsplitPaint();
+  if(wsplit.active >= 0) wsplitKick();
+  document.getElementById('wodSave').onclick = ()=>{
+    const u = wodCardUrl();
+    if(u){ saveDataUrl(u, 'hybrid-wod.jpg'); toast('已存到相册，直接发朋友圈'); }
+  };
+  document.getElementById('wodShare').onclick = shareWod;
+}
+function closeWod(){
+  wsplitFreeze();
+  if(wsplitIv){ clearInterval(wsplitIv); wsplitIv = null; }
+  document.getElementById('wodSheet').classList.remove('on');
+}
+
+function saveDataUrl(url, name){
+  if(window.AndroidBridge && window.AndroidBridge.saveImage){
+    window.AndroidBridge.saveImage(url, name);
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+}
+
+function cfit(x, t, maxW){
+  t = String(t);
+  if(x.measureText(t).width <= maxW) return t;
+  let s = t;
+  while(s.length > 1 && x.measureText(s + '…').width > maxW) s = s.slice(0, -1);
+  return s + '…';
+}
+function cwrap(x, text, left, yy, maxW, lh){
+  const cs = String(text).split('');
+  let line = '';
+  for(const ch of cs){
+    const t = line + ch;
+    if(x.measureText(t).width > maxW && line){
+      x.fillText(line, left, yy); line = ch; yy += lh;
+    } else { line = t; }
+  }
+  if(line){ x.fillText(line, left, yy); yy += lh; }
+  return yy;
+}
+
+function wodCardUrl(){
+  const w = curWod;
+  if(!w) return null;
+  const W = 750, PAD = 68, CW = W - PAD * 2;
+  const MAXH = 3400;
+
+  /* 先画在足够高的草稿上，排完版再按实际内容高度裁剪，避免动作多的 WOD 被截断、底部文字压住二维码 */
+  const tmp = document.createElement('canvas');
+  tmp.width = W; tmp.height = MAXH;
+  const x = tmp.getContext('2d');
+
+  // 底
+  const g = x.createLinearGradient(0, 0, 0, 420);
+  g.addColorStop(0, '#151A20'); g.addColorStop(1, '#0B0D10');
+  x.fillStyle = g; x.fillRect(0, 0, W, 420);
+  x.fillStyle = '#0B0D10'; x.fillRect(0, 420, W, MAXH - 420);
+  x.fillStyle = '#FF8A1F'; x.fillRect(0, 0, W, 7);
+
+  // 头
+  x.fillStyle = '#EDEFF2'; x.font = '800 28px ' + WFONT;
+  x.fillText('HYBRID', PAD, 92);
+  const hw = x.measureText('HYBRID').width;
+  x.fillStyle = '#FF8A1F'; x.fillText('PLAN', PAD + hw + 12, 92);
+  x.fillStyle = '#5E656F'; x.font = '500 19px ' + WFONT;
+  x.fillText('随便练一套 · 练完记时间', PAD, 126);
+
+  // 名称
+  x.fillStyle = '#FFFFFF'; x.font = '800 62px ' + WFONT;
+  x.fillText(cfit(x, w.n, CW), PAD, 226);
+  x.fillStyle = '#FF8A1F'; x.font = '500 23px ' + WFONT;
+  x.fillText(cfit(x, w.c + ' · 约 ' + w.d, CW), PAD, 272);
+  x.fillStyle = '#2A303A'; x.fillRect(PAD, 306, CW, 1);
+
+  // 动作：全部列出，动作多时自动压缩行高与字号
+  let y = 372;
+  const rows = w.m || [];
+  const dense = rows.length > 10;
+  const rowH = dense ? 56 : 66;
+  const fs = dense ? 25 : 29;
+  /* 量文字宽度按实际内容算，别写死，否则长量（2×50 米/100 次到 3 米）会挤掉动作名 */
+  x.font = '700 ' + fs + 'px ' + WFONT;
+  let amtW = 0;
+  rows.forEach(m => { amtW = Math.max(amtW, x.measureText(m[1]).width); });
+  amtW = Math.min(Math.round(CW * 0.56), Math.max(120, Math.ceil(amtW) + 10));
+  rows.forEach((m, i) => {
+    x.fillStyle = '#5E656F'; x.font = '500 19px ' + WFONT;
+    x.fillText(String(i + 1), PAD, y);
+    x.fillStyle = '#EDEFF2'; x.font = '600 ' + fs + 'px ' + WFONT;
+    x.fillText(cfit(x, m[0], CW - amtW - 40), PAD + 44, y);
+    x.textAlign = 'right';
+    x.fillStyle = '#FF8A1F'; x.font = '700 ' + fs + 'px ' + WFONT;
+    x.fillText(cfit(x, m[1], amtW), W - PAD, y);
+    x.textAlign = 'left';
+    x.fillStyle = '#1C2129'; x.fillRect(PAD, y + rowH - 24, CW, 1);
+    y += rowH;
+  });
+
+  // Rx
+  y += 44;
+  x.fillStyle = '#6B7280'; x.font = '500 18px ' + WFONT;
+  x.fillText('RX 标准', PAD, y); y += 34;
+  x.fillStyle = '#B9BFC8'; x.font = '400 22px ' + WFONT;
+  y = cwrap(x, w.rx, PAD, y, CW, 34);
+
+  // 退阶
+  y += 16;
+  x.fillStyle = '#6B7280'; x.font = '500 18px ' + WFONT;
+  x.fillText('做不动就这么改', PAD, y); y += 34;
+  x.fillStyle = '#8FA38F'; x.font = '400 22px ' + WFONT;
+  y = cwrap(x, w.sc, PAD, y, CW, 34);
+
+  // 个人最好
+  const bestS = wodBest(w.n);
+  if(bestS !== null){
+    y += 18;
+    x.fillStyle = '#5FE39B'; x.font = '800 56px ' + WFONT;
+    x.fillText(fmtSec(bestS), PAD, y + 40);
+    x.fillStyle = '#8B929C'; x.font = '500 19px ' + WFONT;
+    x.fillText('个人最好 · 练过 ' + wodRec(w.n).length + ' 次', PAD, y + 76);
+    y += 96;
+  }
+
+  // 二维码：跟着内容走，不再写死坐标
+  const qy = y + 52;
+  x.fillStyle = '#262B34'; x.fillRect(PAD, qy - 30, CW, 1);
+  if(QR_IMG.complete && QR_IMG.naturalWidth > 0){
+    x.fillStyle = '#FFFFFF';
+    x.fillRect(PAD, qy, 156, 156);
+    x.drawImage(QR_IMG, PAD + 8, qy + 8, 140, 140);
+  }
+  x.fillStyle = '#8B929C'; x.font = '500 21px ' + WFONT;
+  x.fillText('混合训练 · Hybrid Plan', 248, qy + 74);
+  x.fillStyle = '#5E656F'; x.font = '400 18px ' + WFONT;
+  x.fillText('扫码加我，一起练', 248, qy + 110);
+
+  x.fillStyle = '#6B7280'; x.font = '500 18px ' + WFONT;
+  x.fillText('练完记时间，下次来比', PAD, qy + 210);
+  x.fillStyle = '#42474F'; x.font = '400 15px ' + WFONT;
+  x.fillText('HYBRID PLAN · v1.1.0', PAD, qy + 240);
+
+  const H = Math.min(MAXH, Math.max(1180, Math.round(qy + 292)));
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const cx = c.getContext('2d');
+  cx.drawImage(tmp, 0, 0, W, H, 0, 0, W, H);
+  return c.toDataURL('image/jpeg', 0.92);
+}
+
+async function shareWod(){
+  const u = wodCardUrl();
+  if(!u){ return; }
+  try{
+    const blob = await (await fetch(u)).blob();
+    const file = new File([blob], 'hybrid-wod.jpg', {type:'image/jpeg'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], text: curWod.n + ' · ' + curWod.c});
+      return;
+    }
+  }catch(err){ /* 用户取消或不支持，走兜底 */ }
+  saveDataUrl(u, 'hybrid-wod.jpg');
+  toast('已保存图片，去相框或微信发出去');
+}
+
+/* ============ 随便练：WOD 页 ============ */
+const WOD_TAGS = ['全部','混氧','力量','举重','体操','箱类','波比','站点','短狠','耐力','长时','EMOM'];
+let wodTag = '全部';
+
+function wodRec(name){
+  return (S.wods && S.wods[name]) || [];
+}
+function wodBest(name){
+  const r = wodRec(name);
+  if(!r.length) return null;
+  return Math.min(...r.map(x=>x.s));
+}
+function fmtSec(sec){
+  const m = Math.floor(sec/60), s = sec%60;
+  return m + ':' + String(s).padStart(2,'0');
+}
+let wodQ = '', wodDice = null, wodTimer = null;
+
+function wodFilter(){
+  const q = wodQ.trim().toLowerCase();
+  return WODS.filter(w=>{
+    if(wodTag !== '全部' && w.t.indexOf(wodTag) < 0) return false;
+    if(!q) return true;
+    return w.n.toLowerCase().indexOf(q) >= 0
+      || w.m.some(x=>String(x[0]).toLowerCase().indexOf(q) >= 0)
+      || w.t.some(t=>t.toLowerCase().indexOf(q) >= 0)
+      || String(w.c).toLowerCase().indexOf(q) >= 0;
+  });
+}
+
+function renderWod(){
+  const seg = document.getElementById('wodSeg');
+  seg.innerHTML = WOD_TAGS.map(t=>`<button data-v="${t}" class="${t===wodTag?'on':''}">${t}</button>`).join('');
+  const body = document.getElementById('wodBody');
+  const q = wodQ.trim();
+  const ql = q.toLowerCase();
+  const list = wodFilter();
+  const cntEl = document.getElementById('wodCount');
+  if(cntEl){
+    if(!q && wodTag === '全部') cntEl.innerHTML = `动作库里共 <b>${WODS.length}</b> 条，搜动作名或摇一签`;
+    else cntEl.innerHTML = `${q?`「${q}」`:wodTag} 找到 <b>${list.length}</b> 条`;
+  }
+  if(!list.length){
+    body.innerHTML = `<div class="empty">没找到「${q}」，换个词试试<br><span style="color:#5E656F">比如 高翻 / 雪橇 / 墙球 / 波比</span></div>`;
+    return;
+  }
+  body.innerHTML = list.map(w=>{ 
+    const lvTx = w.lv === 1 ? '入门' : w.lv === 2 ? '进阶' : '硬核';
+    const best = wodBest(w.n);
+    const cnt = wodRec(w.n).length;
+    return `<div class="wcard" data-n="${w.n}">
+      <div class="hd"><span class="nm">${w.n}</span><span class="lv l${w.lv}">${lvTx}</span></div>
+      <div class="fm">${w.c} · 约 ${w.d}</div>
+      <ul>${w.m.map(x=>`<li class="${ql && String(x[0]).toLowerCase().indexOf(ql)>=0 ? 'hit' : ''}"><span>${x[0]}</span><b>${x[1]}</b></li>`).join('')}</ul>
+      <div class="rx">Rx 标准：${w.rx}</div>
+      <div class="sc">做不动就这么改：${w.sc}</div>
+      <div class="act">
+        <input class="wtime" type="text" inputmode="numeric" data-n="${w.n}" placeholder="完成时间 例如 5:32">
+        <button class="wsv" data-n="${w.n}">存成绩</button>
+      </div>
+      ${best !== null ? `<div class="best">个人最好 ${fmtSec(best)} · 练过 ${cnt} 次 <button class="wrst" data-n="${w.n}">重置</button></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+let armTimer = null;
+document.getElementById('wodBody').addEventListener('click', e=>{
+  const r = e.target.closest('.wrst');
+  if(!r) return;
+  if(r.classList.contains('arm')){
+    const name = r.dataset.n;
+    delete S.wods[name];
+    save();
+    renderWod();
+    toast('已清空 ' + name + ' 的成绩');
+    return;
+  }
+  clearTimeout(armTimer);
+  document.querySelectorAll('.wrst.arm').forEach(x=>{x.classList.remove('arm');x.textContent='重置';});
+  r.classList.add('arm');
+  r.textContent = '确认清空？';
+  armTimer = setTimeout(()=>{ r.classList.remove('arm'); r.textContent='重置'; }, 3000);
+});
+document.getElementById('wodBody').addEventListener('click', e=>{
+  if(e.target.closest('input,button')) return;
+  const card = e.target.closest('.wcard');
+  if(card) openWodSheet(card.dataset.n);
+});
+document.getElementById('wodSheet').addEventListener('click', e=>{
+  if(e.target.id === 'wodSheet') closeWod();
+});
+document.getElementById('wodSheetIn').addEventListener('click', e=>{
+  const go = e.target.closest('.wgo');
+  if(go){
+    if(!wsplit) return;
+    const i = Number(go.dataset.i);
+    if(wsplit.active === i){
+      wsplitFreeze();
+      if(wsplitIv){ clearInterval(wsplitIv); wsplitIv = null; }
+    } else {
+      wsplitFreeze();
+      wsplit.active = i;
+      wsplit.t0 = Date.now();
+      wsplitKick();
+    }
+    if(navigator.vibrate) try{ navigator.vibrate(16); }catch(_){}
+    wsplitPaint();
+    return;
+  }
+  if(e.target.closest('#wodSaveSplit')){ wsplitSave(); return; }
+  const rs = e.target.closest('#wodResetSplit');
+  if(rs){
+    if(rs.classList.contains('arm')){
+      clearTimeout(splitArm);
+      rs.classList.remove('arm');
+      rs.textContent = '清空';
+      wsplitReset(curWod);
+      wsplitPaint();
+      toast('已清空计时');
+      return;
+    }
+    clearTimeout(splitArm);
+    rs.classList.add('arm');
+    rs.textContent = '确认清空？';
+    splitArm = setTimeout(()=>{ rs.classList.remove('arm'); rs.textContent = '清空'; }, 3000);
+  }
+});
+/* 搜索 + 摇一签 */
+(function(){
+  const qEl = document.getElementById('wodQ');
+  const wrap = document.getElementById('wsearch');
+  if(!qEl) return;
+  qEl.addEventListener('input', ()=>{
+    wodQ = qEl.value;
+    wrap.classList.toggle('has', !!wodQ.trim());
+    renderWod();
+  });
+  document.getElementById('wodQClear').addEventListener('click', ()=>{
+    qEl.value = ''; wodQ = ''; wrap.classList.remove('has');
+    renderWod(); qEl.focus();
+  });
+  document.getElementById('wodDice').addEventListener('click', diceRoll);
+  document.getElementById('diceAgain').addEventListener('click', diceRoll);
+  document.getElementById('diceGo').addEventListener('click', ()=>{
+    if(!wodDice) return;
+    const n = wodDice.n;
+    document.getElementById('dice').classList.remove('on');
+    openWodSheet(n);
+  });
+  document.getElementById('dice').addEventListener('click', e=>{
+    if(e.target.id === 'dice') document.getElementById('dice').classList.remove('on');
+  });
+})();
+
+function diceRoll(){
+  const pool = wodFilter();
+  if(!pool.length){ toast('现在这个筛选下没东西可摇'); return; }
+  const box = document.getElementById('dice');
+  const dn = document.getElementById('diceName');
+  const dm = document.getElementById('diceMeta');
+  const go = document.getElementById('diceGo');
+  box.classList.add('on');
+  go.disabled = true;
+  let last = 0;
+  clearInterval(wodTimer);
+  wodTimer = setInterval(()=>{
+    const w = pool[Math.floor(Math.random() * pool.length)];
+    if(w.n === last) return;
+    last = w.n;
+    dn.textContent = w.n;
+    dm.textContent = w.c + ' · 约 ' + w.d;
+    dn.style.opacity = 0.5 + Math.random() * 0.5;
+  }, 62);
+  setTimeout(()=>{
+    clearInterval(wodTimer);
+    const w = pool[Math.floor(Math.random() * pool.length)];
+    wodDice = w;
+    dn.style.opacity = 1;
+    dn.textContent = w.n;
+    dm.textContent = w.c + ' · 约 ' + w.d + ' · ' + (w.lv === 1 ? '入门' : w.lv === 2 ? '进阶' : '硬核');
+    go.disabled = false;
+    if(navigator.vibrate) try{ navigator.vibrate(35); }catch(e){}
+  }, 1020);
+}
+
+document.getElementById('wodSeg').addEventListener('click', e=>{
+
+  const b = e.target.closest('button[data-v]');
+  if(!b) return;
+  wodTag = b.dataset.v;
+  renderWod();
+});
+document.getElementById('wodBody').addEventListener('click', e=>{
+  const b = e.target.closest('.wsv');
+  if(!b) return;
+  const name = b.dataset.n;
+  const inp = [...document.querySelectorAll('.wtime')].find(x=>x.dataset.n === name);
+  const sec = toSec(inp && inp.value);
+  if(!sec){ toast('先填完成时间，例如 5:32'); return; }
+  S.wods = S.wods || {};
+  S.wods[name] = S.wods[name] || [];
+  S.wods[name].push({d: fmtYMD(new Date()), s: sec, m: (WODS.find(x=>x.n===name)||{}).m});
+  save();
+  renderWod();
+  toast('记下了 ' + fmtSec(sec));
+});
+
+/* ============ 今日：记录与容量 ============ */
+function rawLog(w,i){
+  return S.logs && S.logs[w+'-'+i];
+}
+function isDayDone(w,i){
+  const L = rawLog(w,i);
+  return !!(L === true || (L && L.done));
+}
+function itemRec(w,i,k){
+  const L = rawLog(w,i);
+  return (L && L.items && L.items[k]) || {};
+}
+function patchItem(w,i,k,patch){
+  S.logs = S.logs || {};
+  const key = w+'-'+i;
+  const L = (rawLog(w,i) && typeof rawLog(w,i) === 'object') ? rawLog(w,i) : {done:0, items:{}};
+  L.items = L.items || {};
+  L.items[k] = Object.assign({}, L.items[k] || {}, patch);
+  S.logs[key] = L;
+  save();
+}
+function toggleItem(w,i,k){
+  const cur = itemRec(w,i,k).done;
+  /* 勾完成时若没填重量，按模板重量落一条，避免记录里只有勾没有 kg，导致吨位算不出来 */
+  if(!cur && !itemRec(w,i,k).w && todayItems[k]){
+    const pw = planWeight(todayItems[k].rx);
+    if(pw > 0) patchItem(w,i,k,{w: pw});
+  }
+  patchItem(w,i,k,{done: !cur});
+  const all = todayItems.every((_,idx)=> itemRec(w,i,idx).done);
+  const L = rawLog(w,i);
+  if(L && typeof L === 'object'){ L.done = all ? 1 : 0; S.logs[w+'-'+i] = L; save(); }
+}
+/**
+ * 解析计划动作的组 × 次。
+ * 关键：不能把 500m / 30秒 / 15卡 当成 500次 / 30次 / 15次。
+ * 返回 count = 真正能计入「总次数」的单组次数（距离、时间、卡路里一律记 0）。
+ * raw = 单组原始量，供吨位/容量折算使用。
+ */
+function planSets(rx){
+  const m = /(\d+)\s*[×xX]\s*([\d.]+(?:\s*[-–~]\s*[\d.]+)?)\s*(次|个|米|m|km|公里|卡|kcal|秒|s|趟|组)?/.exec(rx || '');
+  if(!m) return {sets:0, reps:0, count:0, raw:0, unit:''};
+  const unit = (m[3] || '').toLowerCase();
+  const nums = (m[2].match(/[\d.]+/g) || []).map(Number).filter(n=>!isNaN(n));
+  if(!nums.length) return {sets:+m[1], reps:0, count:0, raw:0, unit};
+  const n = Math.round(nums.length > 1 ? (Math.min(...nums) + Math.max(...nums)) / 2 : nums[0]);
+  const isCount = unit === '' || unit === '次' || unit === '个' || unit === '趟';
+  const perSide = /\/\s*[侧腿]/.test(rx || '');
+  const count = isCount ? n * (perSide ? 2 : 1) : 0;
+  return {sets:+m[1], reps:count, count, raw:n, unit};
+}
+function planWeight(rx){
+  const m = /@\s*([\d.]+)\s*kg/.exec(rx || '');
+  return m ? +m[1] : 0;
+}
+function volOf(w,i,items){
+  let vol = 0;
+  items.forEach((it,k)=>{
+    if(!itemRec(w,i,k).done) return;
+    const {sets,count,raw} = planSets(it.rx);
+    const wgt = itemRec(w,i,k).w || planWeight(it.rx);
+    vol += sets * count * wgt;
+  });
+  return vol;
+}
+
+/* 已完成的日期集合 */
+function doneDateSet(){
+  const out = {};
+  if(!S.profile) return out;
+  const M = planMeta(S.profile);
+  const a = analyze(S.profile);
+  if(!a) return out;
+  Object.keys(S.logs || {}).forEach(k=>{
+    const L = S.logs[k];
+    const anyItem = L && typeof L === 'object' && L.items && Object.keys(L.items).some(x=> L.items[x] && L.items[x].done);
+    if(!(L === true || (L && L.done) || anyItem)) return;
+    const parts = k.split('-');
+    const w = +parts[0], i = +parts[1];
+    if(!(w >= 1 && w <= M.total)) return;
+    const wk = buildWeek(S.profile, a, w);
+    const d = wk.days[i];
+    if(!d) return;
+    out[fmtYMD(dayDate(M.start, w, d.d))] = true;
+  });
+  return out;
+}
+function renderMonth(){
+  const today = todayMid();
+  const y = today.getFullYear(), m = today.getMonth();
+  const first = new Date(y, m, 1);
+  const lead = (first.getDay()+6) % 7;
+  const total = new Date(y, m+1, 0).getDate();
+  const done = doneDateSet();
+  const map = dayMap();
+  const cells = [];
+  ['一','二','三','四','五','六','日'].forEach(h=> cells.push(`<div class="h">${h}</div>`));
+  for(let i=0;i<lead;i++) cells.push('<div class="d blank"></div>');
+  for(let d=1; d<=total; d++){
+    const dt = new Date(y, m, d);
+    const key = fmtYMD(dt);
+    const isToday = d === today.getDate();
+    const r = map[key];
+    const hasPlan = r && r.plan && r.plan.length;
+    const hasWod = r && r.wod && r.wod.length;
+    let cls = 'd';
+    if(hasPlan) cls += ' on';
+    else if(hasWod) cls += ' won';
+    if(isToday) cls += ' today';
+    cells.push(`<div class="${cls}" data-d="${key}">${d}${(hasPlan&&hasWod)?'<span class="dot"></span>':''}</div>`);
+  }
+  const n = Object.keys(done).filter(k=> k.startsWith(`${y}-${String(m+1).padStart(2,'0')}`)).length;
+  return `<div class="group" style="margin-top:22px">
+    <h2>${m+1} 月 · 已练 ${n} 次</h2>
+    <div class="mon">${cells.join('')}</div>
+    <button class="btn" id="posterBtn" style="margin-top:16px;background:transparent;border:1px solid #4A3316;color:#FFB35C">生成本周海报</button>
+  </div>`;
+}
+
+function dayMap(){
+  const out = {};
+  if(!S.profile) return out;
+  const M = planMeta(S.profile);
+  const a = analyze(S.profile);
+  if(!a) return out;
+  Object.keys(S.logs || {}).forEach(k=>{
+    const L = S.logs[k];
+    const any = L && typeof L === 'object' && L.items && Object.keys(L.items).some(x=> L.items[x] && L.items[x].done);
+    if(!(L === true || (L && L.done) || any)) return;
+    const parts = k.split('-');
+    const w = +parts[0], i = +parts[1];
+    if(!(w >= 1 && w <= M.total)) return;
+    const wk = buildWeek(S.profile, a, w);
+    const d = wk.days[i];
+    if(!d) return;
+    const key = fmtYMD(dayDate(M.start, w, d.d));
+    out[key] = out[key] || {plan:[], wod:[]};
+    out[key].plan.push({t:d.t, items:d.items, L});
+  });
+  Object.keys(S.wods || {}).forEach(n=>{
+    (S.wods[n] || []).forEach(r=>{
+      out[r.d] = out[r.d] || {plan:[], wod:[]};
+      out[r.d].wod.push({n, s:r.s, m:r.m});
+    });
+  });
+  return out;
+}
+function openDaySheet(key){
+  const map = dayMap();
+  const rec = map[key];
+  const d = parseDate(key);
+  const wdTx = '日一二三四五六'[d.getDay()];
+  let html = `<div class="st">${d.getMonth()+1} 月 ${d.getDate()} 日 周${wdTx}</div><div class="sd">${key}</div>`;
+  if(!rec || (!rec.plan.length && !rec.wod.length)){
+    html += `<div class="blk"><div class="row2"><span class="sub2">这天没有记录</span></div></div>`;
+  } else {
+    if(rec.plan.length){
+      html += `<div class="blk"><h4>按计划练</h4>`;
+      rec.plan.forEach(p=>{
+        const n = p.items ? p.items.length : 0;
+        const dn = p.items ? p.items.filter((_,k)=> p.L && p.L.items && p.L.items[k] && p.L.items[k].done).length : 0;
+        html += `<div class="row2"><span>${p.t}</span><span class="sub2">${dn}/${n} 项</span></div>`;
+      });
+      html += `</div>`;
+    }
+    if(rec.wod.length){
+      html += `<div class="blk"><h4>随便练</h4>`;
+      rec.wod.forEach(w=>{
+        html += `<div class="row2"><span>${w.n}<br><span class="sub2">${(w.m||[]).length} 个动作</span></span><b>${fmtSec(w.s)}</b></div>`;
+      });
+      html += `</div>`;
+    }
+  }
+  html += `<button class="close" id="sheetClose">关闭</button>`;
+  document.getElementById('daySheetIn').innerHTML = html;
+  document.getElementById('daySheet').classList.add('on');
+}
+
+let todayItems = [];
+let todayKey = null;
+
+function renderToday(){
+  const body = document.getElementById('todayBody');
+  if(!S.profile){ body.innerHTML = '<div class="empty">先去「我的水平」填数据，生成计划后再回来</div>'; return; }
+  const a = analyze(S.profile);
+  if(!a){ body.innerHTML = '<div class="empty">缺少 5K 成绩，生成不了配速</div>'; return; }
+  const M = prepare();
+  const today = todayMid();
+  const now = new Date();
+
+  /* 今天的日期头 */
+  const head = `<div class="hero"><div class="d">${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} · 星期${'日一二三四五六'[now.getDay()]}</div>`;
+
+  const diffDay = Math.round((today - M.start)/DAYMS);
+  const w = Math.floor(diffDay/7) + 1;
+
+  /* 计划之外 */
+  if(diffDay < 0 || w > M.total){
+    let hint = diffDay < 0
+      ? `计划从 ${fmtMD(M.start)} 开始，还差 ${Math.abs(diffDay)} 天`
+      : (M.race ? `${a.race.label} 已经比完了` : `计划已经走完 ${M.total} 周，回「我的水平」重新生成`);
+    body.innerHTML = head + `<div class="t">不在计划周期内</div></div>` +
+      `<div class="restbox"><div class="t">${hint}</div><div class="s">去「我的」重新生成一份</div></div>`;
+    return;
+  }
+
+  const wk = buildWeek(S.profile, a, w);
+  const days = wk.days.map((d,i)=>({...d, i, date: dayDate(M.start, w, d.d)}));
+  const hit = days.find(d=> d.date.getTime() === today.getTime());
+
+  /* 今天没排训练 */
+  if(!hit){
+    let next = null;
+    for(let ww = w; ww <= M.total && !next; ww++){
+      const wk2 = ww === w ? wk : buildWeek(S.profile, a, ww);
+      const ds = wk2.days.map((d,i)=>({...d, i, date: dayDate(M.start, ww, d.d)}));
+      next = ds.find(d=> d.date.getTime() > today.getTime());
+      if(next) next.w = ww;
+    }
+    body.innerHTML = head + `<div class="t">今天休息</div><div class="pill">恢复日</div></div>` +
+      `<div class="restbox">
+        <div class="t">${next ? `下一个训练日 ${fmtMD(next.date)}` : '计划已经排完了'}</div>
+        <div class="s">${next ? `${next.t} · 好好吃饭睡觉，明天再上量` : ''}</div>
+      </div>` +
+      `<div class="group" style="margin-top:20px"><h2>本周安排</h2>
+        ${days.map(d=>`<div class="it"><div class="l1"><span class="ex">${'周' + '一二三四五六日'[(d.date.getDay()+6)%7]} ${fmtMD(d.date)}</span><span class="rx">${d.t}</span></div></div>`).join('')}
+      </div>` + renderMonth();
+    return;
+  }
+
+  /* 今天的训练 */
+  todayItems = hit.items;
+  todayKey = {w, i: hit.i};
+  const doneN = hit.items.filter((_,k)=> itemRec(w, hit.i, k).done).length;
+  const vol = volOf(w, hit.i, hit.items);
+  const allDone = doneN === hit.items.length;
+
+  const rows = hit.items.map((it,k)=>{
+    const rec = itemRec(w, hit.i, k);
+    const pw = planWeight(it.rx);
+    const weighted = pw > 0 || ['杠','哑','械'].includes(it.eq);
+    const ps = planSets(it.rx);
+    return `<div class="it${rec.done?' done':''}">
+      <div class="l1"><span class="ex">${it.ex}${it.eq?`<i class="eq">${it.eq}</i>`:''}</span><span class="rx">${it.rx}</span></div>
+      ${(S.profile && S.profile.lv === 'new' && EX_ALT[it.ex]) ? `<div class="alt">做不动就换：${EX_ALT[it.ex]}</div>` : ''}
+      <div class="l2">
+        ${weighted ? `<input class="aw" type="number" inputmode="decimal" step="1.25" data-w="${w}" data-i="${hit.i}" data-k="${k}" value="${rec.w || ''}" placeholder="${pw || '重量'}"><span class="unit">kg</span>` : `<span class="unit">${ps.sets ? ps.sets + ' 组' : '按计划'}</span>`}
+        <button class="ck" data-w="${w}" data-i="${hit.i}" data-k="${k}">${rec.done ? '已完成' : '完成'}</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  body.innerHTML = head +
+    `<div class="t">${hit.t}</div><div class="pill">W${String(w).padStart(2,'0')} · 第 ${w} 周 · ${wk.ph.name}</div></div>` +
+    rows +
+    `<div class="sum">
+      <div><div class="k">完成</div><div class="v ${allDone?'acc':''}">${doneN}<span style="font-size:12px;color:var(--dim)">/${hit.items.length} 项</span></div></div>
+      <div><div class="k">训练容量</div><div class="v">${vol ? vol.toLocaleString() : '—'}<span style="font-size:12px;color:var(--dim)"> kg</span></div></div>
+    </div>
+    <div class="note" style="margin-top:14px;font-size:12px;color:var(--dim);line-height:1.8">${hit.note}</div>` + renderMonth();
+}
+
+/* 事件委托：记录 */
+document.getElementById('todayBody').addEventListener('click', e=>{
+  const btn = e.target.closest('.ck');
+  if(!btn) return;
+  const w = +btn.dataset.w, i = +btn.dataset.i, k = +btn.dataset.k;
+  const was = itemRec(w,i,k).done;
+  patchItem(w,i,k,{done: !was});
+  /* 汇总日状态 */
+  const items = todayItems;
+  const all = items.every((_,idx)=> itemRec(w,i,idx).done);
+  const L = rawLog(w,i);
+  if(L && typeof L === 'object'){ L.done = all ? 1 : 0; S.logs[w+'-'+i] = L; save(); }
+  renderToday();
+  if(!was) toast('记下了');
+});
+document.getElementById('todayBody').addEventListener('click', e=>{
+  const cell = e.target.closest('.mon .d[data-d]');
+  if(!cell) return;
+  openDaySheet(cell.dataset.d);
+});
+document.addEventListener('click', e=>{
+  if(e.target.id === 'sheetClose' || e.target.id === 'daySheet'){
+    document.getElementById('daySheet').classList.remove('on');
+  }
+});
+document.getElementById('todayBody').addEventListener('click', e=>{
+  if(e.target.id === 'posterBtn'){ openPoster(); }
+});
+document.getElementById('todayBody').addEventListener('change', e=>{
+  const inp = e.target.closest('.aw');
+  if(!inp) return;
+  const w = +inp.dataset.w, i = +inp.dataset.i, k = +inp.dataset.k;
+  const v = parseFloat(inp.value);
+  patchItem(w,i,k,{w: isNaN(v) ? 0 : v});
+  renderToday();
+});
+
+/* ============ 数据：统计、趋势、备份 ============ */
+function statsBetween(s, e){
+  const map = dayMap();
+  const st = {sessions:0, sets:0, reps:0, ton:0, km:0, wods:0, items:0, days:0, list:[]};
+  for(let d = new Date(s); d.getTime() <= e.getTime(); d = addDays(d, 1)){
+    const key = fmtYMD(d);
+    const r = map[key];
+    if(!r) continue;
+    if(r.plan || r.wod) st.days += 1;
+    if(r.plan){
+      r.plan.forEach(p=>{
+        st.list.push(p.t);
+        st.sessions += 1;
+        /* 整天勾完成（L=true 或 L.done=1）视为所有项都做了；老记录只有整天标记，靠这条兼容 */
+        const allDay = p.L === true || !!(p.L && p.L.done);
+        (p.items || []).forEach((it, k)=>{
+          const il = p.L && p.L.items && p.L.items[k];
+          if(!((il && il.done) || allDay)) return;
+          st.items += 1;
+          const ps = planSets(it.rx);
+          const wgt = (il && il.w) || planWeight(it.rx);
+          st.sets += ps.sets;
+          st.reps += ps.sets * ps.count;
+          st.ton += ps.sets * ps.count * wgt;
+          st.km += runKmFromRx(it.rx);
+        });
+      });
+    }
+    if(r.wod){ st.wods += r.wod.length; r.wod.forEach(w=> st.list.push(w.n + ' ' + fmtSec(w.s))); }
+  }
+  return st;
+}
+
+/* 使用 App 以来全历史累计：直接遍历日志，不绑定当前计划周期；映射不上旧计划时仍计完成项 */
+function allTimeStats(){
+  const st = {days:0, sets:0, reps:0, ton:0, items:0, wods:0};
+  let M = null, a = null;
+  try{ M = planMeta(S.profile); a = analyze(S.profile); }catch(e){}
+  Object.keys(S.logs || {}).forEach(k=>{
+    const L = S.logs[k];
+    if(!L) return;
+    const allDay = L === true || !!(L && L.done);
+    const its = (L && L.items) || {};
+    const doneKeys = Object.keys(its).filter(x=> its[x] && its[x].done);
+    if(!allDay && !doneKeys.length) return;
+    st.days += 1;
+    let items = null;
+    if(M && a){
+      const parts = k.split('-'), w = +parts[0], i = +parts[1];
+      if(w >= 1 && w <= M.total){ const wk = buildWeek(S.profile, a, w); const d = wk.days[i]; if(d) items = d.items; }
+    }
+    if(items){
+      items.forEach((it,idx)=>{
+        const il = its[idx];
+        if(!((il && il.done) || allDay)) return;
+        st.items += 1;
+        const ps = planSets(it.rx);
+        const wgt = (il && il.w) || planWeight(it.rx);
+        st.sets += ps.sets;
+        st.reps += ps.sets * ps.count;
+        st.ton += ps.sets * ps.count * wgt;
+      });
+    }else{
+      st.items += doneKeys.length;
+    }
+  });
+  Object.keys(S.wods || {}).forEach(n=>{ st.wods += (S.wods[n] || []).length; });
+  return st;
+}
+
+function weekTrend(n){
+  const today = todayMid();
+  const out = [];
+  for(let i = n-1; i >= 0; i--){
+    const d = addDays(today, -7*i);
+    const {s, e} = weekRangeOf(d);
+    const st = statsBetween(s, e);
+    out.push({label: fmtMD(s), ton: st.ton, days: st.days, sets: st.sets});
+  }
+  return out;
+}
+
+function wodPrList(){
+  const all = S.wods || {};
+  return Object.keys(all).filter(n=> all[n] && all[n].length).map(n=>{
+    const arr = all[n];
+    const best = arr.reduce((a,b)=> (b.s < a.s ? b : a));
+    const last = arr[arr.length-1];
+    return {n, best: best.s, last: last.s, cnt: arr.length, d: last.d || '',
+            series: arr.slice(-6).map(x=>x.s)};
+  }).sort((a,b)=> b.d.localeCompare(a.d)).slice(0, 6);
+}
+
+/* 迷你折线：越靠上成绩越好 */
+function sparkLine(vals){
+  if(vals.length < 2) return '';
+  const W = 66, H = 22, mx = Math.max(...vals), mn = Math.min(...vals);
+  const pts = vals.map((v, i)=>{
+    const x = 2 + i * (W - 4) / (vals.length - 1);
+    const y = 2 + (v - mn) / ((mx - mn) || 1) * (H - 4);
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" width="66" height="22" style="flex:none"><polyline points="${pts}" fill="none" stroke="#FF8A1F" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+}
+
+function renderData(){
+  const box = document.getElementById('dataKpis');
+  if(!box) return;
+  const group = document.getElementById('dataGroup');
+  if(!S.profile){ group.style.display = 'none'; return; }
+  group.style.display = '';
+
+  const t0 = addDays(todayMid(), -29);
+  const all = statsBetween(t0, todayMid());
+  const total = allTimeStats();
+  box.innerHTML = `
+    <div class="kpi"><div class="k">近 30 天训练</div><div class="v">${all.days}<small>天</small></div></div>
+    <div class="kpi acc"><div class="k">近 30 天吨位</div><div class="v">${(all.ton/1000).toFixed(1)}<small>吨</small></div></div>
+    <div class="kpi"><div class="k">近 30 天 WOD</div><div class="v">${all.wods}<small>次</small></div></div>
+    <div class="kpi"><div class="k">累计训练</div><div class="v">${total.days}<small>天</small></div></div>
+    <div class="kpi"><div class="k">累计吨位</div><div class="v">${(total.ton/1000).toFixed(1)}<small>吨</small></div></div>
+    <div class="kpi"><div class="k">累计次数</div><div class="v">${total.reps.toLocaleString()}<small>次</small></div></div>`;
+
+  const tr = weekTrend(8);
+  const max = Math.max(...tr.map(x=>x.ton), 1);
+  const W = 340, H = 132, pad = 10;
+  const gap = (W - pad*2) / tr.length, bw = gap * 0.6;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:132px;display:block">`;
+  tr.forEach((x, i)=>{
+    const h = Math.round((x.ton / max) * (H - 46));
+    const bx = pad + i*gap + (gap - bw)/2, by = H - 24 - h;
+    const col = i === tr.length-1 ? '#FF8A1F' : '#2E3238';
+    svg += `<rect x="${bx.toFixed(1)}" y="${by}" width="${bw.toFixed(1)}" height="${h}" rx="3" fill="${col}"/>`;
+    if(x.ton > 0) svg += `<text x="${(bx+bw/2).toFixed(1)}" y="${by-4}" text-anchor="middle" font-size="8.5" fill="#8B929C">${(x.ton/1000).toFixed(1)}</text>`;
+    svg += `<text x="${(bx+bw/2).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="8.5" fill="#6B7280">${x.label}</text>`;
+  });
+  svg += '</svg>';
+
+  document.getElementById('dataTrend').innerHTML = `
+    <div style="margin:18px 0 6px;font-size:13px;color:#C9CED6">近 8 周训练容量<small style="color:var(--dim);font-weight:400;margin-left:6px">吨</small></div>
+    ${svg}`;
+
+  const prs = wodPrList();
+  document.getElementById('dataPr').innerHTML = prs.length
+    ? `<div style="margin:18px 0 6px;font-size:13px;color:#C9CED6">WOD 最好成绩<small style="color:var(--dim);font-weight:400;margin-left:6px">折线为最近 6 次，越高越快</small></div>` +
+      prs.map(p=>{
+        const line = sparkLine(p.series);
+        return `<div class="row" style="border-bottom:1px solid #1B1F26">
+          <div class="lab" style="font-size:13px">${p.n}<small style="color:var(--dim);font-size:11px;margin-left:6px">${p.cnt} 次 · 最好 ${fmtSec(p.best)}</small></div>
+          ${line}
+          <div style="font-family:var(--num);font-size:15px;margin-left:8px;color:#C9CED6">${fmtSec(p.last)}</div>
+        </div>`;
+      }).join('')
+    : `<p class="hint" style="margin-top:16px">还没有 WOD 成绩，去「随便练」练一条并保存。</p>`;
+}
+
+/* ============ 渲染：诊断 ============ */
+function renderDiag(){
+  const body = document.getElementById('diagBody');
+  if(!S.profile){ body.innerHTML = '<div class="empty">先在「我的水平」里填数据，再生成计划</div>'; return; }
+  const a = analyze(S.profile);
+  if(!a){ body.innerHTML = '<div class="empty">缺少 5K 成绩，无法计算配速</div>'; return; }
+
+  const diff = a.est - a.goal;
+  const kpis = `
+    <div class="kpis">
+      <div class="kpi"><div class="k">目标完赛</div><div class="v">${fmt(a.goal)}</div></div>
+      <div class="kpi ${diff>0?'bad':'acc'}"><div class="k">当前预估</div><div class="v">${fmt(a.est)}</div></div>
+      <div class="kpi ${diff>0?'bad':'acc'}"><div class="k">${diff>0?'落后':'富余'}</div><div class="v">${fmt(Math.abs(diff))}</div></div>
+    </div>`;
+
+  /* 有效缺口：有精英基准的站点对基准，其余回退到个人目标预算 */
+  const effGap = r => r.bench > 0 ? r.gapBench : r.gap;
+  const rankedEff = a.rows.slice().sort((x,y)=> effGap(y) - effGap(x));
+  const maxGap = Math.max(...a.rows.map(r=>Math.abs(effGap(r))), 1);
+  const hasBench = a.rows.some(r=>r.bench > 0);
+  const genderTx = S.profile.gender === 'w' ? '女' : '男';
+  const bars = a.rows.map(r=>{
+    const gp = effGap(r);
+    const color = gp > 0 ? 'var(--bad)' : 'var(--ok)';
+    const wpx = Math.min(100, Math.abs(gp)/maxGap*100);
+    const txt = r.measured ? (gp>0?'+':'−') + fmt(Math.abs(gp)) : '未测';
+    return `<div class="bar">
+      <div class="n">${r.name}${r.bench ? `<div style="font-size:10px;color:var(--dim)">基准 ${fmt(r.bench)}</div>` : ''}</div>
+      <div class="track"><div class="fill" style="width:${wpx}%;background:${color}"></div></div>
+      <div class="t ${gp>0?'gap':''}">${txt}</div>
+    </div>`;
+  }).join('');
+
+  const top = rankedEff.filter(r=> effGap(r) > 30).slice(0,2);
+  const two = rankedEff.slice(0,2).map(r=>r.name).join(' 和 ');
+  let advice;
+  if(!a.hasData){
+    advice = `还没填站点实测。按 ${a.race.label} 的默认优先级，先练 <b>${two}</b>——这些站在业余选手里最常丢时间。想让诊断更准，回去把站点实测填上。`;
+  }else if(top.length){
+    const names = top.map(r=>`${r.name} +${fmt(effGap(r))}`).join('、');
+    advice = hasBench
+      ? `实测超精英基准最多的：<b>${names}</b>。计划里每周安排一次专项，优先补${top.length>1?'这两个':'这一项'}。`
+      : `实测超预算最多的：<b>${names}</b>。计划里每周安排一次专项，优先补${top.length>1?'这两个':'这一项'}。`;
+  }else{
+    advice = hasBench
+      ? `所有站点都在精英基准内，当前没有明显短板。时间空间主要在跑步段，先压到 ${fmt(a.racePace)}/km。`
+      : `所有站点都在预算内，当前没有明显短板。时间空间主要在跑步段，先压到 ${fmt(a.racePace)}/km。`;
+  }
+
+  const segTxt = a.race.seg
+    ? `跑步段 ${a.race.seg} × ${a.race.km}km 按 ${fmt(a.racePace)}/km 计，共 ${fmt(a.runTotal)}；转换 ${a.race.seg} 次按 ${a.race.trans} 秒计，共 ${fmt(a.trans)}；站点净时间预算 ${fmt(a.stationNet)}。`
+    : `本赛制不设分段跑，全部时间按站点净时间预算 ${fmt(a.stationNet)} 分配。`;
+  const benchSrc = hasBench ? `对标 ${genderTx} Pro 精英分段（2026 赛季大样本基准）；个人目标预算用于完赛时间推算。` : '';
+
+  const M = prepare();
+  const cd = M.race ? `<div class="cd${M.daysLeft<=14?' race':''}">
+      <div><div class="l">距 ${a.race.label} 还有</div><div class="n">${M.daysLeft}<small>天</small></div></div>
+      <div class="r">${fmtYMD(M.race)}<br>${M.total} 周计划</div>
+    </div>` : '';
+
+  body.innerHTML = cd + `
+    <div class="raceTag">赛制：${a.race.label}　·　站点 ${a.rows.length} 个${hasBench ? `　·　对标 ${genderTx} 精英` : ''}</div>
+  ` + kpis + `
+    <div class="group">
+      <h2>${hasBench ? '站点时间：实测 vs 精英基准' : '站点时间：预算 vs 实测'}</h2>
+      <div class="bars">${bars}</div>
+      <div class="legend">
+        <span><i style="background:var(--bad)"></i>${hasBench ? '慢于基准' : '超出预算'}</span>
+        <span><i style="background:var(--ok)"></i>${hasBench ? '达到基准' : '在预算内'}</span>
+      </div>
+    </div>
+    <div class="group">
+      <h2>结论</h2>
+      <p style="font-size:14px;color:#C9CED6;line-height:1.8">${advice}</p>
+      <p style="font-size:12px;color:var(--dim);margin-top:10px">${segTxt}${benchSrc ? '<br>' + benchSrc : ''}</p>
+    </div>
+    <button class="btn" onclick="go('plan')">查看训练计划</button>
+  `;
+}
+
+/* ============ 渲染：计划 ============ */
+function renderPlan(){
+  const body = document.getElementById('planBody');
+  if(!S.profile){ body.innerHTML = '<div class="empty">还没有计划</div>'; return; }
+  const a = analyze(S.profile);
+  if(!a){ body.innerHTML = '<div class="empty">缺少 5K 成绩</div>'; return; }
+
+  const M = prepare();
+
+  const cd = M.race ? (function(){
+    const wr = weekRange(M, M.total);
+    const urgent = M.daysLeft <= 14;
+    return `<div class="cd${urgent?' race':''}">
+      <div>
+        <div class="l">距 ${a.race.label} 还有</div>
+        <div class="n">${M.daysLeft}<small>天</small></div>
+      </div>
+      <div class="r">
+        ${fmtYMD(M.race)}<br>
+        ${M.total} 周计划 · ${fmtMD(wr.s)}–${fmtMD(wr.e)}
+      </div>
+    </div>`;
+  })() : `<div class="cd">
+      <div><div class="l">未设置比赛日期</div><div class="n">12<small>周</small></div></div>
+      <div class="r">按今天起算<br>想对齐比赛，回「我的水平」填日期</div>
+    </div>`;
+
+  const cards = [];
+  for(let w=1; w<=M.total; w++){
+    const pi = phaseOf(w);
+    const ph = PHASES[pi];
+    const pct = Math.round(pctOf(w)*100);
+    const main = SEQ.squat[pi];
+    const vol = volsOf(ph.sets);
+    const doneCount = countDone(w);
+    const wr = weekRange(M, w);
+    cards.push(`<div class="wk" onclick="openWeek(${w})">
+      <div class="ph">${ph.name}</div>
+      <div class="no">W${String(w).padStart(2,'0')}</div>
+      <div class="meta">${main} · ${pct}%</div>
+      <div class="meta">${ph.sets}${vol ? ' · ' + vol + ' 次' : ''}</div>
+      <div class="meta">${fmtMD(wr.s)}–${fmtMD(wr.e)}</div>
+      ${doneCount ? `<div class="done">✓ ${doneCount}</div>` : ''}
+    </div>`);
+  }
+
+  body.innerHTML = cd + `
+<div class="group"><h2>${M.total} 周总览</h2><div class="weeks">${cards.join('')}</div></div>
+    <div id="weekDetail"></div>
+  `;
+}
+
+function countDone(w){
+  const logs = S.logs || {};
+  return Object.keys(logs).filter(k=>k.startsWith(w+'-') && logs[k]).length;
+}
+
+function openWeek(w){
+  const a = analyze(S.profile);
+  const M = prepare();
+  const wk = buildWeek(S.profile, a, w);
+  const det = document.getElementById('weekDetail');
+  const wr = weekRange(M, w);
+
+  const days = wk.days.map((d,i)=>{
+    const key = w+'-'+i;
+    const on = S.logs && S.logs[key];
+    const dt = dayDate(M.start, w, d.d);
+    if(M.race && dt.getTime() > M.race.getTime()) return '';
+    if(M.race && dt.getTime() === M.race.getTime()){
+      return `<div class="day">
+        <div class="top">
+          <div><div class="dn">比赛日 · ${a.race.label}</div><div class="dt">RACE DAY</div></div>
+        </div>
+        <div class="note">当天不复练、不补练。提前 2 小时到场，热身 15 分钟，前 1km 不要冲。</div>
+      </div>`;
+    }
+    const items = d.items.map(it=>`<li><span class="ex">${it.ex}${it.eq?`<i class="eq">${it.eq}</i>`:''}</span><span class="rx">${it.rx}</span></li>`).join('');
+    return `<div class="day">
+      <div class="top">
+        <div><div class="dn">${d.d} ${fmtMD(dt)} · ${d.t}</div><div class="dt">${d.tag}</div></div>
+        <div class="tag" onclick="toggleDay(${w},${i})" style="cursor:pointer;${on?'color:var(--ok);border-color:var(--ok)':''}">${on?'已完成':'标记完成'}</div>
+      </div>
+      <ul>${items}</ul>
+      <div class="note">${d.note}</div>
+    </div>`;
+  }).join('');
+
+  /* 比赛日若不在常规训练日里，单独补一张卡 */
+  const hasRaceCell = M.race && wk.days.some(d=>dayDate(M.start,w,d.d).getTime() === M.race.getTime());
+  const raceCard = (M.race && !hasRaceCell &&
+                    M.race.getTime() >= wr.s.getTime() && M.race.getTime() <= wr.e.getTime())
+    ? `<div class="day">
+        <div class="top">
+          <div><div class="dn">${fmtMD(M.race)} · 比赛日</div><div class="dt">RACE DAY</div></div>
+        </div>
+        <div class="note">${a.race.label}。当天不复练、不补练。提前 2 小时到场，热身 15 分钟，前 1km 不要冲。</div>
+      </div>` : '';
+
+  const chk = (w === M.total) ? `<div class="chk">
+      <h3>赛前 7 天清单</h3>
+      <ul>
+        <li><b>T-7</b>停力量训练，只做活动度 + 轻松跑 25 分钟</li>
+        <li><b>T-5</b>全套比赛装备跑一次 20 分钟，确认鞋袜不磨</li>
+        <li><b>T-3</b>主食每餐加三分之一；睡满 8 小时</li>
+        <li><b>T-2</b>查路线、交通、检录时间，装备装包不临场找</li>
+        <li><b>T-1</b>只做 15 分钟激活，不碰强度；晚上早睡</li>
+        <li><b>当天</b>提前 2 小时到场，热身 15 分钟，前 1km 稳住</li>
+      </ul>
+    </div>` : '';
+
+  det.innerHTML = `<div class="detail">
+    <div class="dhead"><h3>第 ${w} 周 · ${wk.ph.name}</h3><span>${fmtMD(wr.s)}–${fmtMD(wr.e)}｜${wk.ph.sets}｜${Math.round(pctOf(w)*100)}% 1RM</span></div>
+    ${days}
+    ${raceCard}
+    ${chk}
+  </div>`;
+  if(det && det.scrollIntoView) det.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function toggleDay(w,i){
+  const key = w+'-'+i;
+  S.logs = S.logs || {};
+  if(S.logs[key]){ delete S.logs[key]; save(); renderPlan(); openWeek(w); toast('已取消'); return; }
+  /* 整天完成要落明细：否则只有「练了这天」，组数/次数/吨位全算不出来 */
+  let items = [];
+  try{ const a = analyze(S.profile); items = (buildWeek(S.profile, a, w).days[i] || {}).items || []; }catch(e){}
+  const rec = {done:1, items:{}};
+  items.forEach((it,k)=>{ rec.items[k] = {done:1, w: planWeight(it.rx)}; });
+  S.logs[key] = rec;
+  save();
+  renderPlan();
+  openWeek(w);
+  toast(items.length ? '已标记完成（按模板重量计入）' : '已标记完成');
+}
+
+/* ============ 新手引导 ============ */
+const INTRO_STEPS = [
+  {h:'先花两分钟，把你现在的情况填进去',
+   p:'打开「我的水平」：练了多久、三大项能推多重、5K 跑多少。<br>数字不用准，估一个就行 —— <em>填得越实，计划越贴你。</em>'},
+  {h:'有比赛，就把比赛也填上',
+   p:'选赛事类型（Hyrox、DEKA、全力游戏…），填目标完赛时间和你下次比赛的日期。<br>填了日期，计划会<em>自动倒着排</em>：越靠近比赛，强度越高，最后一周自动减量。'},
+  {h:'生成后，先看一眼「弱项」',
+   p:'它会算出每一站该花多少时间，再和你现在的水平对一遍。<br><em>超预算最多的那一站</em>，就是接下来 12 周要重点补的地方 —— 专项日都打它。'},
+  {h:'以后每天只做一件事',
+   p:'打开「今天」，从上往下做，做完打勾、记下每组重量。<br>想加练就点「随便练」，挑一条 WOD 练完记时间。<em>练完记得存一张图。</em>'},
+];
+let introStep = 0;
+function showIntro(){ introStep = 0; renderIntro(); document.getElementById('intro').classList.add('on'); }
+function renderIntro(){
+  const it = INTRO_STEPS[introStep];
+  const last = introStep === INTRO_STEPS.length - 1;
+  document.getElementById('introBox').innerHTML =
+    `<div class="step">第 ${introStep+1} / ${INTRO_STEPS.length} 步</div>
+     <h3>${it.h}</h3>
+     <p>${it.p}</p>
+     <div class="dots">${INTRO_STEPS.map((_,i)=>`<div class="dot ${i<=introStep?'on':''}"></div>`).join('')}</div>
+     <div class="acts">
+       <button class="skip" id="introSkip">${introStep===0?'先跳过':'上一步'}</button>
+       <button class="next" id="introNext">${last?'开始用':'下一步'}</button>
+     </div>
+     <label class="never"><input type="checkbox" id="introNever" ${S.seenIntro?'checked':''}>以后不再显示</label>`;
+  document.getElementById('introNext').onclick = ()=>{
+    if(last){ closeIntro(); return; }
+    introStep++; renderIntro();
+  };
+  document.getElementById('introSkip').onclick = ()=>{
+    if(introStep === 0){ closeIntro(); return; }
+    introStep--; renderIntro();
+  };
+  document.getElementById('intro').onclick = e=>{ if(e.target.id === 'intro') closeIntro(); };
+}
+function closeIntro(){
+  const cb = document.getElementById('introNever');
+  if(cb && cb.checked){ S.seenIntro = true; save(); }
+  document.getElementById('intro').classList.remove('on');
+}
+/* ============ 路由 ============ */
+function go(tab){
+  document.querySelectorAll('section').forEach(s=>s.classList.remove('show'));
+  document.getElementById('tab-'+tab).classList.add('show');
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
+  if(tab==='today') renderToday();
+  if(tab==='wod') renderWod();
+  if(tab==='diag') renderDiag();
+  if(tab==='plan') renderPlan();
+  if(tab==='input') renderData();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+document.querySelectorAll('.nav button').forEach(b=>{
+  b.onclick = ()=>go(b.dataset.tab);
+});
+
+/* ============ 生成 ============ */
+document.getElementById('gen').onclick = ()=>{
+  const p = readForm();
+  if(!p.run5k){ toast('先填 5K 成绩，配速要靠它算'); return; }
+  if(!p.squat || !p.dead){ toast('深蹲和硬拉至少填一个'); return; }
+  S.profile = p;
+  save();
+  renderDiag();
+  renderToday();
+  go('today');
+  toast('计划已生成');
+};
+
+/* ============ 初始化 ============ */
+initSegs();
+if(!S.seenIntro) showIntro();
+if(S.profile){ fillForm(S.profile); renderToday(); renderWod(); renderData(); go('today'); }
+else { renderStationInputs(); renderWod(); go('input'); }
+</script>
+</body>
+</html>
